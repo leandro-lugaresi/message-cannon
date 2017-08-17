@@ -1,0 +1,5 @@
+release:
+  draft: true
+build:
+  goarch:
+    - amd64
