@@ -1,4 +1,4 @@
-package cmd
+package config
 
 import "time"
 
@@ -71,11 +71,10 @@ func (config ExchangeConfig) normalize() {
 
 // QueueConfig describes queue's configuration.
 type QueueConfig struct {
-	Exchange       string  `mapstructure:"exchange"`
-	Name           string  `mapstructure:"name"`
-	RoutingKey     string  `mapstructure:"routing_key"`
-	BindingOptions Options `mapstructure:"binding_options"`
-	Options        Options `mapstructure:"options"`
+	Name           string   `mapstructure:"name"`
+	RoutingKeys    []string `mapstructure:"routing_keys"`
+	BindingOptions Options  `mapstructure:"binding_options"`
+	Options        Options  `mapstructure:"options"`
 }
 
 func (config QueueConfig) normalize() {
