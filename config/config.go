@@ -1,6 +1,10 @@
 package config
 
-import "time"
+import (
+	"time"
+
+	"github.com/streadway/amqp"
+)
 
 // DeliveryMode describes an AMQP message delivery mode.
 type DeliveryMode int
@@ -17,11 +21,6 @@ type Config struct {
 	Consumers   Consumers             `mapstructure:"consumers"`
 }
 
-// Traverses the config tree and fixes option keys name.
-func (config Config) normalize() {
-	config.Consumers.normalize()
-}
-
 // Connections describe the connections used by consumers.
 type Connections map[string]Connection
 
@@ -33,12 +32,6 @@ type Connection struct {
 
 // Consumers describes configuration list for consumers.
 type Consumers map[string]ConsumerConfig
-
-func (consumers Consumers) normalize() {
-	for _, consumer := range consumers {
-		consumer.normalize()
-	}
-}
 
 // ConsumerConfig describes consumer's configuration.
 type ConsumerConfig struct {
@@ -52,21 +45,11 @@ type ConsumerConfig struct {
 	Callback      string         `mapstructure:"callback"`
 }
 
-func (config ConsumerConfig) normalize() {
-	config.Exchange.normalize()
-	config.Queue.normalize()
-	config.Options.normalizeKeys()
-}
-
 // ExchangeConfig describes exchange's configuration.
 type ExchangeConfig struct {
 	Name    string  `mapstructure:"name"`
 	Type    string  `mapstructure:"type"`
 	Options Options `mapstructure:"options"`
-}
-
-func (config ExchangeConfig) normalize() {
-	config.Options.normalizeKeys()
 }
 
 // QueueConfig describes queue's configuration.
@@ -77,39 +60,14 @@ type QueueConfig struct {
 	Options        Options  `mapstructure:"options"`
 }
 
-func (config QueueConfig) normalize() {
-	config.BindingOptions.normalizeKeys()
-	config.Options.normalizeKeys()
-}
-
-// Options describes optional configuration.
-type Options map[string]interface{}
-
-// Map from lowercase option name to the expected name.
-var capitalizationMap = map[string]string{
-	"autodelete":       "autoDelete",
-	"auto_delete":      "autoDelete",
-	"contentencoding":  "contentEncoding",
-	"content_encoding": "contentEncoding",
-	"contenttype":      "contentType",
-	"content_type":     "contentType",
-	"deliverymode":     "deliveryMode",
-	"delivery_mode":    "deliveryMode",
-	"noack":            "noAck",
-	"no_ack":           "noAck",
-	"nolocal":          "noLocal",
-	"no_local":         "noLocal",
-	"nowait":           "noWait",
-	"no_wait":          "noWait",
-}
-
-// By default yaml reader unmarshals keys in lowercase,
-// but AMQP client looks for keys in camelcase.
-func (options Options) normalizeKeys() {
-	for name, value := range options {
-		if correctName, needFix := capitalizationMap[name]; needFix {
-			delete(options, name)
-			options[correctName] = value
-		}
-	}
+// Options describes optionals configuration for consumer, queue, bindings and exchanges.
+type Options struct {
+	Durable    bool       `mapstructure:"durable"`
+	Internal   bool       `mapstructure:"internal"`
+	AutoDelete bool       `mapstructure:"auto_delete"`
+	Exclusive  bool       `mapstructure:"exclusive"`
+	NoWait     bool       `mapstructure:"no_wait"`
+	NoLocal    bool       `mapstructure:"no_local"`
+	AutoAck    bool       `mapstructure:"auto_ack"`
+	Args       amqp.Table `mapstructure:"args"`
 }
