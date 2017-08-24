@@ -4,7 +4,7 @@ services:
   - docker
 
 before_install:
-- docker pull docker pull rabbitmq:3
+- docker pull rabbitmq:3
 - docker run -d --name test-rabbit rabbitmq:3
 
 install: make setup
