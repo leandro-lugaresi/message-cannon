@@ -1,6 +1,6 @@
 connections:
   default:
-    dsn: "amqp://login:password@host:port/virtual_host"
+    dsn: "amqp://guest:guest@localhost:5672/"
     reconnect_delay: 5s
 consumers:
   test1:
