@@ -18,4 +18,4 @@ consumers:
       routing_keys:
         - 'android.#.upload'
         - 'iphone.upload'
-    callback: fooo
+    callback: receive.php

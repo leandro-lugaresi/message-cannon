@@ -4,8 +4,12 @@ import (
 	"bytes"
 	"context"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
+
+	"encoding/json"
+	"time"
 
 	"github.com/leandro-lugaresi/rabbit-cannon/config"
 	"github.com/rs/zerolog"
@@ -28,6 +32,10 @@ func Test_consumer(t *testing.T) {
 	t.Run("Should get messages from queue ", func(t *testing.T) {
 		ch, err := conn.Channel()
 		failIfErr(t, err, "Failed to open another channel ")
+		tmpDir, err := ioutil.TempDir("", "cannon")
+		failIfErr(t, err, "Failed to create the temp directory ")
+		b, err := json.Marshal(map[string]string{"file": filepath.Join(tmpDir, "fooo.txt")})
+		failIfErr(t, err, "Failed to marshal ")
 		ch.Publish(
 			"upload-picture",
 			"iphone.upload",
@@ -37,7 +45,7 @@ func Test_consumer(t *testing.T) {
 				Headers:         amqp.Table{},
 				ContentType:     "text/plain",
 				ContentEncoding: "",
-				Body:            []byte(`{"foo": "baz"}`),
+				Body:            b,
 				DeliveryMode:    amqp.Transient, // 1=non-persistent, 2=persistent
 				Priority:        9,
 			},
@@ -48,19 +56,17 @@ func Test_consumer(t *testing.T) {
 			cerr = consumer.consume(context.Background())
 			done <- true
 		}()
-		_, err = ch.QueueDeclare("reply", false, false, false, false, amqp.Table{})
-		failIfErr(t, err, "Failed to open another channel ")
-		delivery, err := ch.Consume("reply", "test", true, true, false, false, amqp.Table{})
-		failIfErr(t, err, "Failed to get the reply consumer ")
-		msg := <-delivery
-		assert.EqualValues(t, []byte(`{"foo": "baz"}`), msg.Body, "Invalid message")
-		msg.Ack(false)
+		time.Sleep(time.Duration(10 * time.Millisecond))
+		result, err := ioutil.ReadFile(filepath.Join(tmpDir, "fooo.txt"))
+		failIfErr(t, err, "Callback didn't create the file: ")
+
+		assert.EqualValues(t, b, result, "Invalid message")
 		conn.Close()
 		<-done
 		failIfErr(t, cerr, "Consumer exit with an error: ")
 	})
+	os.Remove(t)
 	consumer.channel.QueueDelete(c.Consumers["test1"].Queue.Name, false, false, false)
-	consumer.channel.QueueDelete("reply", false, false, false)
 	consumer.channel.ExchangeDelete(c.Consumers["test1"].Exchange.Name, false, false)
 }
 
