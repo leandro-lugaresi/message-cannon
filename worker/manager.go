@@ -5,13 +5,13 @@ import (
 	"io"
 )
 
-// Runner encapsulates what is done for every message received.
+// Runner encapsulate what is done with messages
 type Runner func(context.Context, io.Writer, []byte) error
 
 // Factory create consumers
 type Factory interface {
-	// CreateConsumers will interate over config and create all the consumers
-	CreateConsumers() (Consumer, error)
+	// CreateConsumers will iterate over config and create all the consumers
+	CreateConsumers() ([]Consumer, error)
 
 	// CreateConsumer create a new consumer for a specific name using the config provided.
 	CreateConsumer(name string) (Consumer, error)
@@ -27,43 +27,61 @@ type Consumer interface {
 	// State() State
 
 	// Run will get the messages and pass to the runner.
-	Run(Runner) error
+	Run() error
 
 	// Kill will try to stop the internal work. Return an error in case of failure.
 	Kill() error
 
-	// Name return the name for this consumer
+	// Name return the consumer name
 	Name() string
 }
 
-// Manager is the block responsible for create all the consumers.
-// Keeping track of the current state os consumers and stop/restart consumers when nedded.
+// Manager is the block responsible for creating all the consumers.
+// Keeping track of the current state of consumers and stop/restart consumers when needed.
 type Manager struct {
-	factories map[string]Factory
-	consumers map[string]Consumer
+	ops chan func(map[string]Factory, map[string]Consumer)
 }
 
-// NewManager will setup all the consumers from fatories.
-func NewManager(factories []Factory) (*Manager, error) {
+// NewManager will init a new manager and wait for operations.
+func NewManager() (*Manager, error) {
 	m := &Manager{}
-	for _, f := range factories {
-		m.factories[f.Name()] = f
-		c, err := f.CreateConsumers()
-		if err != nil {
-			return nil, err
-		}
-
-	}
+	go m.work()
 	return m, nil
 }
 
-// Start will initialize the consumers.
-func (m *Manager) Start() error {
+func (m *Manager) work() {
+	factories := make(map[string]Factory)
+	consumers := make(map[string]Consumer)
+	for op := range m.ops {
+		op(factories, consumers)
+	}
+}
 
+// Start will all the consumers from factories
+func (m *Manager) Start(fs []Factory) error {
+	var err error
+	m.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
+		for _, f := range fs {
+			factories[f.Name()] = f
+			cs, err := f.CreateConsumers()
+			if err != nil {
+				return
+			}
+			for _, c := range cs {
+				consumers[c.Name()] = c
+			}
+		}
+	}
+	return err
 }
 
 // Stop all the consumers
 func (m *Manager) Stop() error {
-
-	return nil
+	var err error
+	m.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
+		for _, c := range consumers {
+			err = c.Kill()
+		}
+	}
+	return err
 }
