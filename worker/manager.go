@@ -1,8 +1,9 @@
-package cmd
+package worker
 
 import (
 	"context"
 	"io"
+	"time"
 )
 
 // Runner encapsulate what is done with messages
@@ -27,26 +28,36 @@ type Consumer interface {
 	// State() State
 
 	// Run will get the messages and pass to the runner.
-	Run() error
+	Run()
 
 	// Kill will try to stop the internal work. Return an error in case of failure.
 	Kill() error
 
+	// Alive returns true if the tomb is not in a dying or dead state.
+	Alive() bool
+
 	// Name return the consumer name
 	Name() string
+
+	// FactoryName is the name of the factory responsible for this consumer.
+	FactoryName() string
 }
 
 // Manager is the block responsible for creating all the consumers.
 // Keeping track of the current state of consumers and stop/restart consumers when needed.
 type Manager struct {
-	ops chan func(map[string]Factory, map[string]Consumer)
+	checkAliveness time.Duration
+	ops            chan func(map[string]Factory, map[string]Consumer)
 }
 
-// NewManager will init a new manager and wait for operations.
-func NewManager() (*Manager, error) {
-	m := &Manager{}
+// NewManager init a new manager and wait for operations.
+func NewManager(intervalChecks time.Duration) *Manager {
+	m := &Manager{
+		checkAliveness: intervalChecks,
+	}
 	go m.work()
-	return m, nil
+	go m.checkConsumers()
+	return m
 }
 
 func (m *Manager) work() {
@@ -57,7 +68,7 @@ func (m *Manager) work() {
 	}
 }
 
-// Start will all the consumers from factories
+// Start all the consumers from factories
 func (m *Manager) Start(fs []Factory) error {
 	var err error
 	m.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
@@ -71,17 +82,53 @@ func (m *Manager) Start(fs []Factory) error {
 				consumers[c.Name()] = c
 			}
 		}
+		for _, c := range consumers {
+			c.Run()
+
+		}
 	}
 	return err
 }
 
 // Stop all the consumers
 func (m *Manager) Stop() error {
-	var err error
+	var errors MultiError
 	m.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
 		for _, c := range consumers {
-			err = c.Kill()
+			err := c.Kill()
+			if err != nil {
+				errors = append(errors, err)
+			}
 		}
 	}
-	return err
+	return errors
+}
+
+func (m *Manager) checkConsumers() {
+	tick := time.Tick(m.checkAliveness)
+	for {
+		select {
+		case <-tick:
+			m.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
+				for name, c := range consumers {
+					if !c.Alive() {
+						c.Kill() //? we realy need to kill a consumer already dead?
+						delete(consumers, name)
+						f, ok := factories[c.FactoryName()]
+						if ok {
+							//TODO: add log, for some reason the factory didn't exist anymore
+							continue
+						}
+						c, err := f.CreateConsumer(name)
+						if err != nil {
+							//TODO: Add log
+							continue
+						}
+						consumers[c.Name()] = c
+						c.Run()
+					}
+				}
+			}
+		}
+	}
 }
