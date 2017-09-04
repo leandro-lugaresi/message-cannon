@@ -11,14 +11,16 @@ type MultiError []error
 
 func (m MultiError) Error() string {
 	s, n := "", 0
+	var lastErr error
 	for _, e := range m {
 		if e != nil {
+			lastErr = e
 			s = s + fmt.Sprintf("\n\t - %s", e.Error())
 			n++
 		}
 	}
-	if n > 1 {
-		s = "Multi errors: " + s
+	if n == 1 {
+		return lastErr.Error()
 	}
-	return s
+	return "Multi errors: " + s
 }
