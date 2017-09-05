@@ -1,7 +1,15 @@
 language: go
 go: 1.8.1
+services:
+  - docker
+
+before_install:
+- docker pull rabbitmq:3
+- docker run -d --name test-rabbit rabbitmq:3
+
 install: make setup
 script: make ci
+
 after_success:
   - bash <(curl -s https://codecov.io/bash)
   - test -n "$TRAVIS_TAG" && curl -sL http://git.io/goreleaser | bash

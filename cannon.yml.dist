@@ -1,0 +1,39 @@
+connections:
+  default:
+    dsn: "amqp://login:password@host:port/virtual_host"
+    reconnect_delay: 5s  # Interval between connection tries. Check https://golang.org/pkg/time/#ParseDuration for details.
+  another:
+    # See https://www.rabbitmq.com/uri-spec.html on how to encode values.
+    dsn: 'amqp://guest:password@localhost:5672/vhost?lazy=1&connection_timeout=6'
+consumers:
+  upload_picture:
+    connection: default
+    workers: 1                           # Workers count. Defaults to 1.
+    prefetch_count: 0                    # Prefetch message count per worker.
+    prefetch_size: 0                     # Prefetch message size per worker.
+    exchange:
+      name: 'upload-picture'
+      type: direct
+      options:
+        # Available options with default values:
+        auto_delete: false
+        durable: false
+        internal: false
+        no_wait: false
+    queue:
+      name: "upload-picture"
+      routing_keys:
+        - 'android.#.upload'
+        - 'iphone.upload'
+      options:
+        auto_delete: false
+        durable: false
+        exclusive: false
+        no_wait: false
+    # Available options with default values:
+    options:
+      no_ack: false
+      no_local: false
+      no_wait: false
+      exclusive: false
+    callback: /path/to/symfony/app/console
