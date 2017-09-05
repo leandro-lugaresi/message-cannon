@@ -1,0 +1,21 @@
+connections:
+  default:
+    dsn: "amqp://guest:guest@localhost:5672/"
+    reconnect_delay: 5s
+consumers:
+  test1:
+    connection: default
+    workers: 1                           # Workers count. Defaults to 1.
+    prefetch_count: 0                    # Prefetch message count per worker.
+    prefetch_size: 0                     # Prefetch message size per worker.
+    exchange:
+      name: 'upload-picture'
+      type: direct
+      options:
+        no_wait: true
+    queue:
+      name: "upload-picture"
+      routing_keys:
+        - 'android.#.upload'
+        - 'iphone.upload'
+    callback: receive.php
