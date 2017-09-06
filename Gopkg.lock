@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  name = "github.com/davecgh/go-spew"
+  packages = ["spew"]
+  revision = "346938d642f2ec3594ed81d874461961cd0faa76"
+  version = "v1.1.0"
+
+[[projects]]
   name = "github.com/fsnotify/fsnotify"
   packages = ["."]
   revision = "629574ca2a5df945712d3079857300b5e4da0236"
@@ -44,10 +50,10 @@
   version = "v1.0.0"
 
 [[projects]]
-  name = "github.com/rs/zerolog"
-  packages = [".","internal/json"]
-  revision = "2ed2f2c974489526d10329dae76d0f175684109a"
-  version = "v1.2.2"
+  name = "github.com/pmezard/go-difflib"
+  packages = ["difflib"]
+  revision = "792786c7400a136282c1664665ae0a8db921c6c2"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
@@ -86,10 +92,34 @@
   version = "v1.0.0"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/streadway/amqp"
+  name = "github.com/stretchr/testify"
+  packages = ["assert"]
+  revision = "69483b4bd14f5845b5a1e55bca19e954e827f1d0"
+  version = "v1.1.4"
+
+[[projects]]
+  name = "go.uber.org/atomic"
   packages = ["."]
-  revision = "2cbfe40c9341ad63ba23e53013b3ddc7989d801c"
+  revision = "4e336646b2ef9fc6e47be8e21594178f98e5ebcf"
+  version = "v1.2.0"
+
+[[projects]]
+  name = "go.uber.org/multierr"
+  packages = ["."]
+  revision = "3c4937480c32f4c13a875a1829af76c98ca3d40a"
+  version = "v1.1.0"
+
+[[projects]]
+  name = "go.uber.org/zap"
+  packages = [".","buffer","internal/bufferpool","internal/color","internal/exit","zapcore"]
+  revision = "3216c4c73e8ebbafff73c456dd27143f4a7c1f94"
+  version = "v1.6.0"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/net"
+  packages = ["context"]
+  revision = "66aacef3dd8a676686c7ae3716979581e8b03c47"
 
 [[projects]]
   branch = "master"
@@ -105,6 +135,12 @@
 
 [[projects]]
   branch = "v2"
+  name = "gopkg.in/tomb.v2"
+  packages = ["."]
+  revision = "d5d1b5820637886def9eef33e03a27a9f166942c"
+
+[[projects]]
+  branch = "v2"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
   revision = "eb3733d160e74a9c7e442f435eb3bea458e1d19f"
@@ -112,6 +148,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f3a0969b8fe70cd68026fc2c6e3babcdfaf5b1adb48e68acaeff618b6be0a635"
+  inputs-digest = "231b45fc3dd0a6092d1e6d06394f70ab5c12c3843d5125db0f329f50f2bf595e"
   solver-name = "gps-cdcl"
   solver-version = 1
