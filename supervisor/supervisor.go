@@ -3,18 +3,22 @@ package supervisor
 import (
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // Manager is the block responsible for creating all the consumers.
 // Keeping track of the current state of consumers and stop/restart consumers when needed.
 type Manager struct {
+	logger         *zap.Logger
 	checkAliveness time.Duration
 	ops            chan func(map[string]Factory, map[string]Consumer)
 }
 
 // NewManager init a new manager and wait for operations.
-func NewManager(intervalChecks time.Duration) *Manager {
+func NewManager(intervalChecks time.Duration, logger *zap.Logger) *Manager {
 	m := &Manager{
+		logger:         logger,
 		checkAliveness: intervalChecks,
 		ops:            make(chan func(map[string]Factory, map[string]Consumer)),
 	}
@@ -85,28 +89,31 @@ func (m *Manager) Stop() error {
 func (m *Manager) checkConsumers() {
 	tick := time.Tick(m.checkAliveness)
 	for range tick {
+		m.logger.Debug("Sending check operation")
 		m.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
 			for name, c := range consumers {
 				if !c.Alive() {
-					err := c.Kill() //? we really need to kill a consumer already dead?
-					if err != nil {
-						//TODO: ADD logs
-					}
 					delete(consumers, name)
 					f, ok := factories[c.FactoryName()]
 					if !ok {
-						//TODO: add log, for some reason the factory didn't exist anymore?
+						m.logger.Warn("Factory did not exist anymore",
+							zap.String("factory-name", c.FactoryName()),
+							zap.String("consumer-name", c.Name()))
 						continue
 					}
 					c, err := f.CreateConsumer(name)
 					if err != nil {
-						//TODO: ADD logs
+						m.logger.Error("Error recreating one consumer",
+							zap.Error(err),
+							zap.String("factory-name", c.FactoryName()),
+							zap.String("consumer-name", c.Name()))
 						continue
 					}
 					consumers[c.Name()] = c
 					c.Run()
 				}
 			}
+			m.logger.Debug("check operation finished")
 		}
 	}
 }
