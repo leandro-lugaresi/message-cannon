@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 func TestManager(t *testing.T) {
@@ -14,7 +15,7 @@ func TestManager(t *testing.T) {
 		newStubFactory("RabbitMQ", 4),
 		newStubFactory("NATS", 3),
 	}
-	manager := NewManager(time.Duration(50 * time.Millisecond))
+	manager := NewManager(time.Duration(50*time.Millisecond), zap.NewNop())
 	t.Run("Should start all consumers from factories", func(t *testing.T) {
 		err := manager.Start(factories)
 		assert.NoError(t, err, "Start should not return an error")
