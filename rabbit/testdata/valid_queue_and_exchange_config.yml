@@ -1,21 +1,48 @@
-connections:
-  default:
-    dsn: "amqp://guest:guest@localhost:5672/"
-    reconnect_delay: 5s
-consumers:
-  test1:
-    connection: default
-    workers: 1                           # Workers count. Defaults to 1.
-    prefetch_count: 0                    # Prefetch message count per worker.
-    prefetch_size: 0                     # Prefetch message size per worker.
-    exchange:
-      name: 'upload-picture'
-      type: direct
+rabbitmq:
+  connections:
+    default:
+      dsn: "amqp://guest:guest@localhost:5672/"
+      reconnect_delay: 5s
+    test1:
+      dsn: "amqp://guest:guest@localhost:5672/foo"
+  exchanges:
+    upload-picture:
+      type: topic
       options:
         no_wait: true
-    queue:
-      name: "upload-picture"
-      routing_keys:
-        - 'android.#.upload'
-        - 'iphone.upload'
-    callback: receive.php
+    logs:
+      type: topic
+      options:
+        no_wait: true
+    other:
+      type: direct
+  consumers:
+    test1:
+      connection: default
+      workers: 1                           # Workers count. Defaults to 1.
+      prefetch_count: 0                    # Prefetch message count per worker.
+      prefetch_size: 0                     # Prefetch message size per worker.
+      exchange: upload-picture
+      queue:
+        name: "upload-picture"
+        routing_keys:
+          - 'android.#.upload'
+          - 'iphone.upload'
+      callback: receive.php
+    test2:
+      connection: default
+      workers: 2                           # Workers count. Defaults to 1.
+      prefetch_count: 0                    # Prefetch message count per worker.
+      prefetch_size: 0                     # Prefetch message size per worker.
+      exchange: "logs"
+      callback: receive.php
+      queue:
+        name: "notify-legacy"
+        bindings:
+          -
+            exchange: "logs"
+            routing_keys:
+              - 'newsystem.*'
+              - ''
+          -
+            exchange: "other"

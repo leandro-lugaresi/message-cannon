@@ -1,4 +1,4 @@
-package config
+package rabbit
 
 import (
 	"time"
@@ -19,10 +19,18 @@ const (
 type Config struct {
 	Connections map[string]Connection `mapstructure:"connections"`
 	Consumers   Consumers             `mapstructure:"consumers"`
+	Exchanges   Exchanges             `mapstructure:"exchanges"`
 }
 
 // Connections describe the connections used by consumers.
 type Connections map[string]Connection
+
+// Exchanges all the exchanges used by consumer.
+// This exchanges are declared on startup of the rabbitMQ factory.
+type Exchanges map[string]ExchangeConfig
+
+// Consumers describes configuration list for consumers.
+type Consumers map[string]ConsumerConfig
 
 // Connection describe a config for one connection.
 type Connection struct {
@@ -30,34 +38,35 @@ type Connection struct {
 	ReconnectDelay time.Duration `mapstructure:"reconnect_delay"`
 }
 
-// Consumers describes configuration list for consumers.
-type Consumers map[string]ConsumerConfig
-
 // ConsumerConfig describes consumer's configuration.
 type ConsumerConfig struct {
-	Connection    string         `mapstructure:"connection"`
-	Workers       int            `mapstructure:"workers"`
-	PrefetchCount int            `mapstructure:"prefetch_count"`
-	PrefetchSize  int            `mapstructure:"prefetch_size"`
-	Exchange      ExchangeConfig `mapstructure:"exchange"`
-	Queue         QueueConfig    `mapstructure:"queue"`
-	Options       Options        `mapstructure:"options"`
-	Callback      string         `mapstructure:"callback"`
+	Connection    string      `mapstructure:"connection"`
+	Workers       int         `mapstructure:"workers"`
+	PrefetchCount int         `mapstructure:"prefetch_count"`
+	PrefetchSize  int         `mapstructure:"prefetch_size"`
+	Queue         QueueConfig `mapstructure:"queue"`
+	Options       Options     `mapstructure:"options"`
+	Callback      string      `mapstructure:"callback"`
 }
 
 // ExchangeConfig describes exchange's configuration.
 type ExchangeConfig struct {
-	Name    string  `mapstructure:"name"`
 	Type    string  `mapstructure:"type"`
 	Options Options `mapstructure:"options"`
 }
 
 // QueueConfig describes queue's configuration.
 type QueueConfig struct {
-	Name           string   `mapstructure:"name"`
-	RoutingKeys    []string `mapstructure:"routing_keys"`
-	BindingOptions Options  `mapstructure:"binding_options"`
-	Options        Options  `mapstructure:"options"`
+	Name     string    `mapstructure:"name"`
+	Bindings []Binding `mapstructure:"bindings"`
+	Options  Options   `mapstructure:"options"`
+}
+
+// Binding describe how a queue connects to a exchange.
+type Binding struct {
+	Exchange    string   `mapstructure:"exchange"`
+	RoutingKeys []string `mapstructure:"routing_keys"`
+	Options     Options  `mapstructure:"options"`
 }
 
 // Options describes optionals configuration for consumer, queue, bindings and exchanges.

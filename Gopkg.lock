@@ -50,6 +50,12 @@
   version = "v1.0.0"
 
 [[projects]]
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
+
+[[projects]]
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
   revision = "792786c7400a136282c1664665ae0a8db921c6c2"
@@ -90,6 +96,12 @@
   packages = ["."]
   revision = "25b30aa063fc18e48662b86996252eabdcf2f0c7"
   version = "v1.0.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/streadway/amqp"
+  packages = ["."]
+  revision = "2cbfe40c9341ad63ba23e53013b3ddc7989d801c"
 
 [[projects]]
   name = "github.com/stretchr/testify"
@@ -148,6 +160,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "231b45fc3dd0a6092d1e6d06394f70ab5c12c3843d5125db0f329f50f2bf595e"
+  inputs-digest = "cb6ba62f8a548ae6664288a8d401be2521986c7f1d4d95db59db7e7310b19346"
   solver-name = "gps-cdcl"
   solver-version = 1
