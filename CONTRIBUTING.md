@@ -5,7 +5,7 @@ conduct](/CODE_OF_CONDUCT.md).
 
 ## Setup your machine
 
-`rabbit-cannon` is written in [Go](https://golang.org/).
+`message-cannon` is written in [Go](https://golang.org/).
 
 Prerequisites are:
 
@@ -13,19 +13,19 @@ Prerequisites are:
   * `make`
   * [Go 1.8+](http://golang.org/doc/install)
 
-Clone `rabbit-cannon` from source into `$GOPATH`:
+Clone `message-cannon` from source into `$GOPATH`:
 
 ```sh
-$ git clone git@github.com:leandro-lugaresi/rabbit-cannon.git $GOPATH/src/github.com/leandro-lugaresi/rabbit-cannon
-$ cd $GOPATH/src/github.com/leandro-lugaresi/rabbit-cannon
+$ git clone git@github.com:leandro-lugaresi/message-cannon.git $GOPATH/src/github.com/leandro-lugaresi/message-cannon
+$ cd $GOPATH/src/github.com/leandro-lugaresi/message-cannon
 ```
 
 If you created a fork clone your fork and after add the my repository as upstream remote:
 
 ```sh
-$ git clone git@github.com:{your-name}/rabbit-cannon.git $GOPATH/src/github.com/leandro-lugaresi/rabbit-cannon
-$ cd $GOPATH/src/github.com/leandro-lugaresi/rabbit-cannon
-$ git remote add upstream git@github.com:leandro-lugaresi/rabbit-cannon.git
+$ git clone git@github.com:{your-name}/message-cannon.git $GOPATH/src/github.com/leandro-lugaresi/message-cannon
+$ cd $GOPATH/src/github.com/leandro-lugaresi/message-cannon
+$ git remote add upstream git@github.com:leandro-lugaresi/message-cannon.git
 ```
 
 ### Install

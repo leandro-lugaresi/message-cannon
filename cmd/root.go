@@ -12,7 +12,7 @@ var cfgFile string
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
-	Use:   "rabbit-cannon",
+	Use:   "message-cannon",
 	Short: "Consume rabbitMQ messages and send to any cli program",
 }
 
