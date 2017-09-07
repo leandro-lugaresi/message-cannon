@@ -1,6 +1,6 @@
 package main
 
-import "github.com/leandro-lugaresi/rabbit-cannon/cmd"
+import "github.com/leandro-lugaresi/message-cannon/cmd"
 
 var version = "master"
 
