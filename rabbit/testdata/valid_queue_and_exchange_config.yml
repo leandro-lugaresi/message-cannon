@@ -4,7 +4,7 @@ rabbitmq:
       dsn: "amqp://guest:guest@localhost:5672/"
       reconnect_delay: 5s
     test1:
-      dsn: "amqp://guest:guest@localhost:5672/foo"
+      dsn: "amqp://guest:guest@localhost:5672/"
   exchanges:
     upload-picture:
       type: topic

@@ -25,6 +25,11 @@ func Test_factory(t *testing.T) {
 			assert.True(t, consumer.Alive(), "The consumer ", consumer.Name(), "is not alive")
 		}
 	})
+	t.Run("When call CreateConsumer and we go a specific consumer", func(t *testing.T) {
+		consumer, err := factory.CreateConsumer("test1")
+		failIfErr(t, err, "Failed to create all the consumers")
+		assert.NotNil(t, consumer)
+	})
 	ch, err := factory.conns["default"].Channel()
 	failIfErr(t, err, "Error opening a channel")
 	for _, cfg := range factory.config.Consumers {
@@ -33,6 +38,17 @@ func Test_factory(t *testing.T) {
 	for name := range factory.config.Exchanges {
 		ch.ExchangeDelete(name, false, false)
 	}
+}
+
+func Test_factory_should_return_error(t *testing.T) {
+	c := testGetConfig(t, "valid_queue_and_exchange_config.yml")
+	t.Run("When call CreateConsumers we got all the consumers from config", func(t *testing.T) {
+		conn := c.Connections["test1"]
+		conn.DSN = "amqp://guest:guest@localhost:5672/foo"
+		c.Connections["test1"] = conn
+		_, err := NewFactory(c, zap.NewNop())
+		assert.EqualError(t, err, "error opening the connection \"test1\": Exception (403) Reason: \"no access to this vhost\"")
+	})
 }
 
 func testGetConfig(t *testing.T, configFile string) Config {
