@@ -42,7 +42,7 @@ func Test_factory(t *testing.T) {
 
 func Test_factory_should_return_error(t *testing.T) {
 	c := testGetConfig(t, "valid_queue_and_exchange_config.yml")
-	t.Run("When call CreateConsumers we got all the consumers from config", func(t *testing.T) {
+	t.Run("On factory, when we pass a invalid dsn we get an error", func(t *testing.T) {
 		conn := c.Connections["test1"]
 		conn.DSN = "amqp://guest:guest@localhost:5672/foo"
 		c.Connections["test1"] = conn

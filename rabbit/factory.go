@@ -2,10 +2,12 @@ package rabbit
 
 import (
 	"strings"
+	"sync/atomic"
 
 	"gopkg.in/tomb.v2"
 
 	"github.com/pkg/errors"
+	"github.com/speps/go-hashids"
 	"github.com/streadway/amqp"
 	"go.uber.org/zap"
 )
@@ -15,6 +17,7 @@ type Factory struct {
 	config Config
 	conns  map[string]*amqp.Connection
 	log    *zap.Logger
+	number int64
 }
 
 // NewFactory will open the initial connections and start the recover connections procedure.
@@ -31,6 +34,7 @@ func NewFactory(config Config, log *zap.Logger) (*Factory, error) {
 		config,
 		conns,
 		log,
+		1,
 	}
 	return f, nil
 }
@@ -114,8 +118,21 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	if err := ch.Qos(cfg.PrefetchCount, cfg.PrefetchSize, false); err != nil {
 		return nil, errors.Wrap(err, "failed to set QoS")
 	}
+	hash, err := hashids.New()
+	if err != nil {
+		f.log.Warn("Problem generating the hash", zap.Error(err))
+	}
+	atomic.AddInt64(&f.number, 1)
+	hashcounter, err := hash.EncodeInt64([]int64{f.number})
+	if err != nil {
+		f.log.Warn("Problem generating the hash", zap.Error(err))
+	}
+
 	return &consumer{
+		queue:       cfg.Queue.Name,
 		name:        name,
+		hash:        hashcounter,
+		opts:        cfg.Options,
 		factoryName: f.Name(),
 		channel:     ch,
 		t:           tomb.Tomb{},
