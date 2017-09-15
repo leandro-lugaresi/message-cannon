@@ -28,14 +28,19 @@ rabbitmq:
         routing_keys:
           - 'android.#.upload'
           - 'iphone.upload'
-      callback: receive.php
+      type: command
+        options:
+          path: "receive.php"
     test2:
       connection: default
       workers: 2                           # Workers count. Defaults to 1.
       prefetch_count: 0                    # Prefetch message count per worker.
       prefetch_size: 0                     # Prefetch message size per worker.
       exchange: "logs"
-      callback: receive.php
+      runner:
+        type: command
+        options:
+          path: "receive.php"
       queue:
         name: "notify-legacy"
         bindings:
