@@ -13,7 +13,7 @@ import (
 )
 
 func Test_factory(t *testing.T) {
-	c := testGetConfig(t, "valid_queue_and_exchange_config.yml")
+	c := getConfig(t, "valid_queue_and_exchange_config.yml")
 	factory, err := NewFactory(c, zap.NewNop())
 	failIfErr(t, err, "Failed to create the factory")
 	assert.Len(t, factory.conns, 2)
@@ -41,7 +41,7 @@ func Test_factory(t *testing.T) {
 }
 
 func Test_factory_should_return_error(t *testing.T) {
-	c := testGetConfig(t, "valid_queue_and_exchange_config.yml")
+	c := getConfig(t, "valid_queue_and_exchange_config.yml")
 	t.Run("On factory, when we pass a invalid dsn we get an error", func(t *testing.T) {
 		conn := c.Connections["test1"]
 		conn.DSN = "amqp://guest:guest@localhost:5672/foo"
@@ -51,7 +51,7 @@ func Test_factory_should_return_error(t *testing.T) {
 	})
 }
 
-func testGetConfig(t *testing.T, configFile string) Config {
+func getConfig(t *testing.T, configFile string) Config {
 	c := Config{}
 	viper.Reset()
 	viper.SetConfigType("yaml")

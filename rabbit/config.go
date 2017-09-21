@@ -3,6 +3,7 @@ package rabbit
 import (
 	"time"
 
+	"github.com/leandro-lugaresi/message-cannon/runner"
 	"github.com/streadway/amqp"
 )
 
@@ -40,13 +41,13 @@ type Connection struct {
 
 // ConsumerConfig describes consumer's configuration.
 type ConsumerConfig struct {
-	Connection    string      `mapstructure:"connection"`
-	Workers       int         `mapstructure:"workers"`
-	PrefetchCount int         `mapstructure:"prefetch_count"`
-	PrefetchSize  int         `mapstructure:"prefetch_size"`
-	Queue         QueueConfig `mapstructure:"queue"`
-	Options       Options     `mapstructure:"options"`
-	Callback      string      `mapstructure:"callback"`
+	Connection    string        `mapstructure:"connection"`
+	Workers       int           `mapstructure:"workers"`
+	PrefetchCount int           `mapstructure:"prefetch_count"`
+	PrefetchSize  int           `mapstructure:"prefetch_size"`
+	Queue         QueueConfig   `mapstructure:"queue"`
+	Options       Options       `mapstructure:"options"`
+	Runner        runner.Config `mapstructure:"runner"`
 }
 
 // ExchangeConfig describes exchange's configuration.

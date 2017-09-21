@@ -6,6 +6,7 @@ import (
 
 	"gopkg.in/tomb.v2"
 
+	"github.com/leandro-lugaresi/message-cannon/runner"
 	"github.com/pkg/errors"
 	"github.com/speps/go-hashids"
 	"github.com/streadway/amqp"
@@ -127,7 +128,10 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	if err != nil {
 		f.log.Warn("Problem generating the hash", zap.Error(err))
 	}
-
+	runner, err := runner.New(f.log.With(zap.String("consumer", name)), cfg.Runner)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create the runner")
+	}
 	return &consumer{
 		queue:       cfg.Queue.Name,
 		name:        name,
@@ -136,22 +140,23 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 		factoryName: f.Name(),
 		channel:     ch,
 		t:           tomb.Tomb{},
+		runner:      runner,
 	}, nil
 }
 
-func (f *Factory) declareExchange(ch *amqp.Channel, exname string) error {
-	if len(exname) == 0 {
+func (f *Factory) declareExchange(ch *amqp.Channel, name string) error {
+	if len(name) == 0 {
 		f.log.Warn("received a black exchange. wrong config?")
 		return nil
 	}
-	f.log.Debug("declaring an exchange", zap.String("exchange", exname))
-	ex, ok := f.config.Exchanges[exname]
+	f.log.Debug("declaring an exchange", zap.String("exchange", name))
+	ex, ok := f.config.Exchanges[name]
 	if !ok {
 		f.log.Warn("exchange config didn't exist, we will try to continue")
 		return nil
 	}
 	err := ch.ExchangeDeclare(
-		exname,
+		name,
 		ex.Type,
 		ex.Options.Durable,
 		ex.Options.AutoDelete,
@@ -159,7 +164,7 @@ func (f *Factory) declareExchange(ch *amqp.Channel, exname string) error {
 		ex.Options.NoWait,
 		ex.Options.Args)
 	if nil != err {
-		return errors.Wrapf(err, "failed to declare the exchange %s", exname)
+		return errors.Wrapf(err, "failed to declare the exchange %s", name)
 	}
 	return nil
 }

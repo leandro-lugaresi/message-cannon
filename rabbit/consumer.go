@@ -2,15 +2,16 @@ package rabbit
 
 import (
 	"context"
-	"io"
 
 	"gopkg.in/tomb.v2"
 
+	"github.com/leandro-lugaresi/message-cannon/runner"
 	"github.com/streadway/amqp"
+	"go.uber.org/zap"
 )
 
 type consumer struct {
-	runner      func(context.Context, io.Writer, []byte) error
+	runner      runner.Runnable
 	hash        string
 	name        string
 	queue       string
@@ -18,6 +19,7 @@ type consumer struct {
 	opts        Options
 	channel     *amqp.Channel
 	t           tomb.Tomb
+	l           *zap.Logger
 }
 
 // Run will get the messages and pass to the runner.
@@ -39,9 +41,8 @@ func (c *consumer) Run() {
 				return nil
 			case err := <-c.channel.NotifyClose(make(chan *amqp.Error)):
 				return err
-			case <-d:
-
-				//TODO: Process the message :p
+			case msg := <-d:
+				c.processMessage(msg)
 			}
 		}
 	})
@@ -68,4 +69,21 @@ func (c *consumer) Name() string {
 // FactoryName is the name of the factory responsible for this consumer.
 func (c *consumer) FactoryName() string {
 	return c.factoryName
+}
+
+func (c *consumer) processMessage(msg amqp.Delivery) {
+	status := c.runner.Process(context.Background(), msg.Body)
+	switch status {
+	case runner.ExitACK:
+		msg.Ack(false)
+	case runner.ExitFailed:
+		msg.Reject(true)
+	case runner.ExitRetry, runner.ExitNACKRequeue:
+		msg.Nack(false, true)
+	case runner.ExitNACK:
+		msg.Nack(false, false)
+	default:
+		c.l.Warn("The runner return an unexpected exitStatus and the message will be rejected.", zap.Int("status", status))
+		msg.Reject(false)
+	}
 }
