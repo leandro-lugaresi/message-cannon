@@ -30,14 +30,16 @@ type Runnable interface {
 	Process(context.Context, []byte) int
 }
 
+type Options struct {
+	Path string   `mapstructure:"path"`
+	Args []string `mapstructure:"args"`
+}
+
 // Config is an composition of all options and configurations used by this runnables.
 type Config struct {
-	Type         string `mapstructure:"type"`
-	IgnoreOutput bool   `mapstructure:"ignore-output"`
-	Options      struct {
-		Path string   `mapstructure:"path"`
-		Args []string `mapstructure:"args"`
-	} `mapstructure:"options"`
+	Type         string  `mapstructure:"type"`
+	IgnoreOutput bool    `mapstructure:"ignore-output"`
+	Options      Options `mapstructure:"options"`
 }
 
 type command struct {
