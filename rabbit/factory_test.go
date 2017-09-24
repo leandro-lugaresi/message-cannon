@@ -18,7 +18,8 @@ func Test_factory(t *testing.T) {
 	failIfErr(t, err, "Failed to create the factory")
 	assert.Len(t, factory.conns, 2)
 	t.Run("When call CreateConsumers and we got all the consumers from config", func(t *testing.T) {
-		consumers, err := factory.CreateConsumers()
+		var consumers []*consumer
+		consumers, err = factory.CreateConsumers()
 		failIfErr(t, err, "Failed to create all the consumers")
 		assert.Len(t, consumers, 2)
 		for _, consumer := range consumers {
@@ -26,7 +27,8 @@ func Test_factory(t *testing.T) {
 		}
 	})
 	t.Run("When call CreateConsumer and we got a specific consumer", func(t *testing.T) {
-		consumer, err := factory.CreateConsumer("test1")
+		var consumer *consumer
+		consumer, err = factory.CreateConsumer("test1")
 		failIfErr(t, err, "Failed to create all the consumers")
 		assert.NotNil(t, consumer)
 		assert.True(t, consumer.Alive(), "The consumer ", consumer.Name(), "is not alive")
@@ -34,10 +36,12 @@ func Test_factory(t *testing.T) {
 	ch, err := factory.conns["default"].Channel()
 	failIfErr(t, err, "Error opening a channel")
 	for _, cfg := range factory.config.Consumers {
-		ch.QueueDelete(cfg.Queue.Name, false, false, false)
+		_, err := ch.QueueDelete(cfg.Queue.Name, false, false, false)
+		failIfErr(t, err)
 	}
 	for name := range factory.config.Exchanges {
-		ch.ExchangeDelete(name, false, false)
+		err := ch.ExchangeDelete(name, false, false)
+		failIfErr(t, err)
 	}
 }
 
@@ -59,7 +63,8 @@ func getConfig(t *testing.T, configFile string) Config {
 	viper.SetEnvPrefix("test")
 	yaml, err := ioutil.ReadFile(filepath.Join("testdata", configFile))
 	failIfErr(t, err, "Failed to read the config file: ")
-	viper.ReadConfig(bytes.NewBuffer(yaml))
+	err = viper.ReadConfig(bytes.NewBuffer(yaml))
+	failIfErr(t, err)
 	viper.AutomaticEnv()
 
 	err = viper.UnmarshalKey("rabbitmq", &c)
@@ -67,8 +72,8 @@ func getConfig(t *testing.T, configFile string) Config {
 	return c
 }
 
-func failIfErr(t *testing.T, err error, msg string) {
+func failIfErr(t *testing.T, err error, msg ...interface{}) {
 	if err != nil {
-		t.Fatal(msg, err)
+		t.Fatal(err, msg)
 	}
 }

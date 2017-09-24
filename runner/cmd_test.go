@@ -74,7 +74,10 @@ func Test_command_Process(t *testing.T) {
 			if got := c.Process(ctx, tt.args.b); got != tt.want {
 				t.Errorf("command.Process() = %v, want %v", got, tt.want)
 			}
-			w.Close()
+			err := w.Close()
+			if err != nil {
+				t.Fatal(err, "failed to close the pipe writer")
+			}
 			out, _ := ioutil.ReadAll(r)
 			for _, entry := range tt.logEntries {
 				assert.Contains(t, string(out), entry, "")

@@ -25,7 +25,12 @@ type consumer struct {
 // Run will get the messages and pass to the runner.
 func (c *consumer) Run() {
 	c.t.Go(func() error {
-		defer c.channel.Close()
+		defer func() {
+			err := c.channel.Close()
+			if err != nil {
+				c.l.Error("Error closing the consumer channel", zap.Error(err))
+			}
+		}()
 		d, err := c.channel.Consume(c.queue, "rabbitmq-"+c.name+"-"+c.hash,
 			c.opts.AutoAck,
 			c.opts.Exclusive,
@@ -74,17 +79,21 @@ func (c *consumer) FactoryName() string {
 
 func (c *consumer) processMessage(msg amqp.Delivery) {
 	status := c.runner.Process(context.Background(), msg.Body)
+	var err error
 	switch status {
 	case runner.ExitACK:
-		msg.Ack(false)
+		err = msg.Ack(false)
 	case runner.ExitFailed:
-		msg.Reject(true)
+		err = msg.Reject(true)
 	case runner.ExitRetry, runner.ExitNACKRequeue, runner.ExitTimeout:
-		msg.Nack(false, true)
+		err = msg.Nack(false, true)
 	case runner.ExitNACK:
-		msg.Nack(false, false)
+		err = msg.Nack(false, false)
 	default:
 		c.l.Warn("The runner return an unexpected exitStatus and the message will be rejected.", zap.Int("status", status))
-		msg.Reject(false)
+		err = msg.Reject(false)
+	}
+	if err != nil {
+		c.l.Error("Error during the acknowledgement phase", zap.Error(err))
 	}
 }

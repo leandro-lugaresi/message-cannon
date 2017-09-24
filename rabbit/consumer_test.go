@@ -33,10 +33,12 @@ func Test_consumer(t *testing.T) {
 	<-time.After(100 * time.Millisecond)
 	assert.EqualValues(t, 10, runner.messagesProcessed())
 	for _, cfg := range factory.config.Consumers {
-		ch.QueueDelete(cfg.Queue.Name, false, false, false)
+		_, err := ch.QueueDelete(cfg.Queue.Name, false, false, false)
+		failIfErr(t, err)
 	}
 	for name := range factory.config.Exchanges {
-		ch.ExchangeDelete(name, false, false)
+		err := ch.ExchangeDelete(name, false, false)
+		failIfErr(t, err)
 	}
 }
 

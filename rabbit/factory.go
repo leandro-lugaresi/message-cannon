@@ -23,7 +23,7 @@ type Factory struct {
 
 // NewFactory will open the initial connections and start the recover connections procedure.
 func NewFactory(config Config, log *zap.Logger) (*Factory, error) {
-	conns := make(map[string]*amqp.Connection, 0)
+	conns := make(map[string]*amqp.Connection)
 	for name, cfgConn := range config.Connections {
 		conn, err := amqp.Dial(cfgConn.DSN)
 		if err != nil {
@@ -102,12 +102,12 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 			zap.String("queue", q.Name),
 			zap.String("consumer", name),
 			zap.String("exchange", b.Exchange))
-		err := f.declareExchange(ch, b.Exchange)
+		err = f.declareExchange(ch, b.Exchange)
 		if err != nil {
 			return nil, err
 		}
 		for _, k := range b.RoutingKeys {
-			err := ch.QueueBind(q.Name, k, b.Exchange,
+			err = ch.QueueBind(q.Name, k, b.Exchange,
 				b.Options.NoWait, b.Options.Args)
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to bind the queue \"%s\" to exchange: \"%s\"", q.Name, b.Exchange)
@@ -119,13 +119,10 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 		zap.Int("count", cfg.PrefetchCount),
 		zap.Int("size", cfg.PrefetchSize),
 		zap.String("consumer", name))
-	if err := ch.Qos(cfg.PrefetchCount, cfg.PrefetchSize, false); err != nil {
+	if err = ch.Qos(cfg.PrefetchCount, cfg.PrefetchSize, false); err != nil {
 		return nil, errors.Wrap(err, "failed to set QoS")
 	}
-	hash, err := hashids.New()
-	if err != nil {
-		f.log.Warn("Problem generating the hash", zap.Error(err))
-	}
+	hash := hashids.New()
 	atomic.AddInt64(&f.number, 1)
 	hashcounter, err := hash.EncodeInt64([]int64{f.number})
 	if err != nil {
