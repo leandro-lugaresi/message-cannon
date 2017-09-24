@@ -4,6 +4,8 @@ services:
   - docker
 
 before_install:
+- sudo apt-get -qq update
+- sudo apt-get install -y php
 - docker pull rabbitmq:3
 - docker run -d --name test-rabbit rabbitmq:3
 
