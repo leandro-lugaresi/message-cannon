@@ -17,7 +17,7 @@ func Test_factory(t *testing.T) {
 	factory, err := NewFactory(c, zap.NewNop())
 	failIfErr(t, err, "Failed to create the factory")
 	assert.Len(t, factory.conns, 2)
-	t.Run("When call CreateConsumers we got all the consumers from config", func(t *testing.T) {
+	t.Run("When call CreateConsumers and we got all the consumers from config", func(t *testing.T) {
 		consumers, err := factory.CreateConsumers()
 		failIfErr(t, err, "Failed to create all the consumers")
 		assert.Len(t, consumers, 2)
@@ -25,10 +25,11 @@ func Test_factory(t *testing.T) {
 			assert.True(t, consumer.Alive(), "The consumer ", consumer.Name(), "is not alive")
 		}
 	})
-	t.Run("When call CreateConsumer and we go a specific consumer", func(t *testing.T) {
+	t.Run("When call CreateConsumer and we got a specific consumer", func(t *testing.T) {
 		consumer, err := factory.CreateConsumer("test1")
 		failIfErr(t, err, "Failed to create all the consumers")
 		assert.NotNil(t, consumer)
+		assert.True(t, consumer.Alive(), "The consumer ", consumer.Name(), "is not alive")
 	})
 	ch, err := factory.conns["default"].Channel()
 	failIfErr(t, err, "Error opening a channel")

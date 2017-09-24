@@ -97,8 +97,11 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 		return nil, errors.Wrapf(err, "failed to declare the queue \"%s\"", cfg.Queue.Name)
 	}
 
-	f.log.Debug("adding queue binds", zap.String("queue", q.Name), zap.String("consumer", name))
 	for _, b := range cfg.Queue.Bindings {
+		f.log.Debug("adding queue bind",
+			zap.String("queue", q.Name),
+			zap.String("consumer", name),
+			zap.String("exchange", b.Exchange))
 		err := f.declareExchange(ch, b.Exchange)
 		if err != nil {
 			return nil, err
@@ -141,6 +144,7 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 		channel:     ch,
 		t:           tomb.Tomb{},
 		runner:      runner,
+		l:           f.log.With(zap.String("consumer", name)),
 	}, nil
 }
 

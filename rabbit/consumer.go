@@ -33,6 +33,7 @@ func (c *consumer) Run() {
 			c.opts.NoWait,
 			c.opts.Args)
 		if err != nil {
+			c.l.Error("Failed to start consume", zap.Error(err))
 			return err
 		}
 		for {
@@ -78,7 +79,7 @@ func (c *consumer) processMessage(msg amqp.Delivery) {
 		msg.Ack(false)
 	case runner.ExitFailed:
 		msg.Reject(true)
-	case runner.ExitRetry, runner.ExitNACKRequeue:
+	case runner.ExitRetry, runner.ExitNACKRequeue, runner.ExitTimeout:
 		msg.Nack(false, true)
 	case runner.ExitNACK:
 		msg.Nack(false, false)

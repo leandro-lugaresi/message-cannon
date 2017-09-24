@@ -18,6 +18,7 @@ import (
 // Exit constants used to know how handle the message.
 // The consumer runnig is the responsible to understand this status and handle them properly.
 const (
+	ExitTimeout     = -1
 	ExitACK         = 0
 	ExitFailed      = 1
 	ExitNACK        = 3

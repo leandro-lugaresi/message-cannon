@@ -9,11 +9,11 @@ rabbitmq:
     upload-picture:
       type: topic
       options:
-        no_wait: true
+        no_wait: false
     logs:
       type: topic
       options:
-        no_wait: true
+        no_wait: false
     other:
       type: direct
   consumers:
@@ -25,12 +25,16 @@ rabbitmq:
       exchange: upload-picture
       queue:
         name: "upload-picture"
-        routing_keys:
-          - 'android.#.upload'
-          - 'iphone.upload'
-      type: command
+        bindings:
+          -
+            routing_keys:
+              - 'android.#.upload'
+              - 'iphone.upload'
+            exchange: upload-picture
+      runner:
+        type: command
         options:
-          path: "receive.php"
+          path: "testdata/receive.php"
     test2:
       connection: default
       workers: 2                           # Workers count. Defaults to 1.
@@ -40,7 +44,7 @@ rabbitmq:
       runner:
         type: command
         options:
-          path: "receive.php"
+          path: "testdata/receive.php"
       queue:
         name: "notify-legacy"
         bindings:
