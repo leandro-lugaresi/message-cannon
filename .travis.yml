@@ -1,11 +1,8 @@
 language: go
 go: 1.8.1
+sudo: required
 services:
-  - docker
-
-before_install:
-- docker pull rabbitmq:3
-- docker run -d --name test-rabbit rabbitmq:3
+  - rabbitmq
 
 install: make setup
 script: make ci

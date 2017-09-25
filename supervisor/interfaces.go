@@ -1,13 +1,5 @@
 package supervisor
 
-import (
-	"context"
-	"io"
-)
-
-// Runner encapsulate what is done with messages
-type Runner func(context.Context, io.Writer, []byte) error
-
 // Factory create consumers
 type Factory interface {
 	// CreateConsumers will iterate over config and create all the consumers
