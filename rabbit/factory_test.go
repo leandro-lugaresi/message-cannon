@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/leandro-lugaresi/message-cannon/supervisor"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +19,7 @@ func Test_factory(t *testing.T) {
 	failIfErr(t, err, "Failed to create the factory")
 	assert.Len(t, factory.conns, 2)
 	t.Run("When call CreateConsumers and we got all the consumers from config", func(t *testing.T) {
-		var consumers []*consumer
+		var consumers []supervisor.Consumer
 		consumers, err = factory.CreateConsumers()
 		failIfErr(t, err, "Failed to create all the consumers")
 		assert.Len(t, consumers, 2)
@@ -27,7 +28,7 @@ func Test_factory(t *testing.T) {
 		}
 	})
 	t.Run("When call CreateConsumer and we got a specific consumer", func(t *testing.T) {
-		var consumer *consumer
+		var consumer supervisor.Consumer
 		consumer, err = factory.CreateConsumer("test1")
 		failIfErr(t, err, "Failed to create all the consumers")
 		assert.NotNil(t, consumer)

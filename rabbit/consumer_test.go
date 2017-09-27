@@ -16,12 +16,12 @@ func Test_consumer(t *testing.T) {
 	c := getConfig(t, "valid_queue_and_exchange_config.yml")
 	factory, err := NewFactory(c, zap.NewNop())
 	failIfErr(t, err, "Failed to create the factory")
-	consumer, err := factory.CreateConsumer("test1")
+	cons, err := factory.CreateConsumer("test1")
 	failIfErr(t, err, "Failed to create all the consumers")
 	runner := &mockRunner{count: 0, exitStatus: 0}
-	consumer.runner = runner
-	consumer.Run()
-	assert.NotNil(t, consumer.runner, "Consumer runner must not be null")
+	cons.(*consumer).runner = runner
+	cons.Run()
+	assert.NotNil(t, cons.(*consumer).runner, "Consumer runner must not be null")
 	ch, err := factory.conns["default"].Channel()
 	failIfErr(t, err, "Error opening a channel")
 	for i := 0; i < 10; i++ {
