@@ -22,7 +22,6 @@ rabbitmq:
       workers: 1                           # Workers count. Defaults to 1.
       prefetch_count: 0                    # Prefetch message count per worker.
       prefetch_size: 0                     # Prefetch message size per worker.
-      exchange: upload-picture
       queue:
         name: "upload-picture"
         bindings:
@@ -40,7 +39,6 @@ rabbitmq:
       workers: 2                           # Workers count. Defaults to 1.
       prefetch_count: 0                    # Prefetch message count per worker.
       prefetch_size: 0                     # Prefetch message size per worker.
-      exchange: "logs"
       runner:
         type: command
         options:
