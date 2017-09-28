@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -49,7 +50,7 @@ var launchCmd = &cobra.Command{
 			return errors.Wrap(err, "failed on supervisor start")
 		}
 		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, os.Interrupt, os.Kill, syscall.SIGTERM, syscall.SIGINT)
+		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
 		// Block until a signal is received.
 		s := <-sigs
@@ -66,7 +67,13 @@ var launchCmd = &cobra.Command{
 func init() {
 	launchCmd.Flags().DurationP("interval-checks", "c", 500*time.Millisecond, "this flag set the interval duration of supervisor operations")
 	launchCmd.Flags().BoolP("development", "d", false, "this flag enable the development mode")
-	viper.BindPFlag("interval-checks", launchCmd.Flags().Lookup("interval-checks"))
-	viper.BindPFlag("development", launchCmd.Flags().Lookup("development"))
+	err := viper.BindPFlag("interval-checks", launchCmd.Flags().Lookup("interval-checks"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = viper.BindPFlag("development", launchCmd.Flags().Lookup("development"))
+	if err != nil {
+		log.Fatal(err)
+	}
 	RootCmd.AddCommand(launchCmd)
 }
