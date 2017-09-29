@@ -7,6 +7,7 @@ import (
 	"gopkg.in/tomb.v2"
 
 	"github.com/leandro-lugaresi/message-cannon/runner"
+	"github.com/leandro-lugaresi/message-cannon/supervisor"
 	"github.com/pkg/errors"
 	"github.com/speps/go-hashids"
 	"github.com/streadway/amqp"
@@ -41,8 +42,8 @@ func NewFactory(config Config, log *zap.Logger) (*Factory, error) {
 }
 
 // CreateConsumers will iterate over config and create all the consumers
-func (f *Factory) CreateConsumers() ([]*consumer, error) {
-	var consumers []*consumer
+func (f *Factory) CreateConsumers() ([]supervisor.Consumer, error) {
+	var consumers []supervisor.Consumer
 	for name, cfg := range f.config.Consumers {
 		consumer, err := f.newConsumer(name, cfg)
 		if err != nil {
@@ -54,7 +55,7 @@ func (f *Factory) CreateConsumers() ([]*consumer, error) {
 }
 
 // CreateConsumer create a new consumer for a specific name using the config provided.
-func (f *Factory) CreateConsumer(name string) (*consumer, error) {
+func (f *Factory) CreateConsumer(name string) (supervisor.Consumer, error) {
 	cfg, ok := f.config.Consumers[name]
 	if !ok {
 		return nil, errors.Errorf("consumer \"%s\" did not exist", name)

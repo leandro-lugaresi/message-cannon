@@ -39,7 +39,7 @@ lint: ## Run all the linters
 ci: lint test ## Run all the tests and code checks
 
 build: ## Build a beta version
-	go build -o message-cannon ./main.go
+	go build -race -o ./dist/message-cannon ./main.go
 
 install: ## Install to $GOPATH/src
 	go install ./...

@@ -16,12 +16,12 @@ func Test_consumer(t *testing.T) {
 	c := getConfig(t, "valid_queue_and_exchange_config.yml")
 	factory, err := NewFactory(c, zap.NewNop())
 	failIfErr(t, err, "Failed to create the factory")
-	consumer, err := factory.CreateConsumer("test1")
+	cons, err := factory.CreateConsumer("test1")
 	failIfErr(t, err, "Failed to create all the consumers")
+	assert.NotNil(t, cons.(*consumer).runner, "Consumer runner must not be null")
 	runner := &mockRunner{count: 0, exitStatus: 0}
-	consumer.runner = runner
-	consumer.Run()
-	assert.NotNil(t, consumer.runner, "Consumer runner must not be null")
+	cons.(*consumer).runner = runner
+	cons.Run()
 	ch, err := factory.conns["default"].Channel()
 	failIfErr(t, err, "Error opening a channel")
 	for i := 0; i < 10; i++ {
@@ -30,7 +30,7 @@ func Test_consumer(t *testing.T) {
 		})
 		failIfErr(t, err, "error publishing to rabbitMQ")
 	}
-	<-time.After(100 * time.Millisecond)
+	<-time.After(200 * time.Millisecond)
 	assert.EqualValues(t, 10, runner.messagesProcessed())
 	for _, cfg := range factory.config.Consumers {
 		_, err := ch.QueueDelete(cfg.Queue.Name, false, false, false)
