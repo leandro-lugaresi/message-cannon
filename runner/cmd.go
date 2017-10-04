@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"io/ioutil"
@@ -53,12 +52,23 @@ type command struct {
 
 func (c *command) Process(ctx context.Context, b []byte) int {
 	cmd := exec.CommandContext(ctx, c.cmd, c.args...)
-	var bf bytes.Buffer
-	bf.Write(b)
-	cmd.Stdin = &bf
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		c.l.Error("Receive an error creating the stdin pipe", zap.Error(err))
+	}
+	go func() {
+		_, err := stdin.Write(b)
+		if err != nil {
+			c.l.Error("Failed writing to stdin", zap.Error(err))
+		}
+		err = stdin.Close()
+		if err != nil {
+			c.l.Error("Failed closing stdin", zap.Error(err))
+		}
+	}()
 	cmd.Stderr = c.stdErrLogger
 	cmd.Stdout = c.stdOutLogger
-	err := cmd.Run()
+	err = cmd.Run()
 
 	if err != nil {
 		c.l.Error("Receive an error from command", zap.Error(err))

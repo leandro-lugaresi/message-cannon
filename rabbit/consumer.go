@@ -41,11 +41,13 @@ func (c *consumer) Run() {
 			c.l.Error("Failed to start consume", zap.Error(err))
 			return err
 		}
+		dying := c.t.Dying()
+		closed := c.channel.NotifyClose(make(chan *amqp.Error))
 		for {
 			select {
-			case <-c.t.Dying():
+			case <-dying:
 				return nil
-			case err := <-c.channel.NotifyClose(make(chan *amqp.Error)):
+			case err := <-closed:
 				return err
 			case msg := <-d:
 				c.processMessage(msg)
