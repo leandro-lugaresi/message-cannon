@@ -57,8 +57,14 @@ func (c *command) Process(ctx context.Context, b []byte) int {
 		c.l.Error("Receive an error creating the stdin pipe", zap.Error(err))
 	}
 	go func() {
-		defer stdin.Close()
-		stdin.Write(b)
+		_, err := stdin.Write(b)
+		if err != nil {
+			c.l.Error("Failed writing to stdin", zap.Error(err))
+		}
+		err = stdin.Close()
+		if err != nil {
+			c.l.Error("Failed closing stdin", zap.Error(err))
+		}
 	}()
 	cmd.Stderr = c.stdErrLogger
 	cmd.Stdout = c.stdOutLogger

@@ -32,7 +32,6 @@ lint: ## Run all the linters
 		--enable=misspell \
 		--enable=errcheck \
 		--enable=vet \
-		--enable=vetshadow \
 		--deadline=10m \
 		./...
 
