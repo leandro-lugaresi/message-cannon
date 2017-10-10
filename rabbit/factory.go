@@ -3,12 +3,14 @@ package rabbit
 import (
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"gopkg.in/tomb.v2"
 
 	"github.com/leandro-lugaresi/message-cannon/runner"
 	"github.com/leandro-lugaresi/message-cannon/supervisor"
 	"github.com/pkg/errors"
+	"github.com/rafaeljesus/retry-go"
 	"github.com/speps/go-hashids"
 	"github.com/streadway/amqp"
 	"go.uber.org/zap"
@@ -69,7 +71,7 @@ func (f *Factory) Name() string {
 }
 
 func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error) {
-	conn, ok := f.conns[cfg.Connection]
+	_, ok := f.conns[cfg.Connection]
 	if !ok {
 		available := []string{}
 		for cname := range f.conns {
@@ -80,9 +82,24 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 			name,
 			strings.Join(available, ", "))
 	}
+
 	f.log.Debug("opening one connection channel", zap.String("connection", cfg.Connection))
-	ch, err := conn.Channel()
-	if nil != err {
+	var ch *amqp.Channel
+	err := retry.Do(func() error {
+		var err error
+		conn := f.conns[cfg.Connection]
+		ch, err = conn.Channel()
+		if err != nil && err.Error() == amqp.ErrClosed.Error() {
+			cfgConn := f.config.Connections[cfg.Connection]
+			conn, errDial := amqp.Dial(cfgConn.DSN)
+			if errDial != nil {
+				return errors.Wrapf(errDial, "error reopening the connection \"%s\"", cfg.Connection)
+			}
+			f.conns[cfg.Connection] = conn
+		}
+		return err
+	}, 3, time.Second)
+	if err != nil {
 		return nil, errors.Wrap(err, "failed to open the rabbitMQ channel")
 	}
 

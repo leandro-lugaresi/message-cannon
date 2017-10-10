@@ -14,7 +14,7 @@ import (
 )
 
 func Test_factory(t *testing.T) {
-	c := getConfig(t, "valid_queue_and_exchange_config.yml")
+	c := getConfig(t, "valid_two_connections_config.yml")
 	factory, err := NewFactory(c, zap.NewNop())
 	failIfErr(t, err, "Failed to create the factory")
 	assert.Len(t, factory.conns, 2)

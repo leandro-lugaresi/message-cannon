@@ -2,6 +2,7 @@ package rabbit
 
 import (
 	"context"
+	"errors"
 
 	"gopkg.in/tomb.v2"
 
@@ -50,6 +51,9 @@ func (c *consumer) Run() {
 			case err := <-closed:
 				return err
 			case msg := <-d:
+				if msg.Acknowledger == nil {
+					return errors.New("receive an empty delivery")
+				}
 				c.processMessage(msg)
 			}
 		}

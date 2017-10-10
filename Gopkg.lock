@@ -32,6 +32,12 @@
   version = "v1.7.3"
 
 [[projects]]
+  name = "github.com/michaelklishin/rabbit-hole"
+  packages = ["."]
+  revision = "751d8f6874248f7243698c6f8377983879d744e9"
+  version = "v1.4.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/mitchellh/mapstructure"
   packages = ["."]
@@ -166,6 +172,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e07325f726af3e832ad15f97320e73f91656b7d1644c5225dd414e9c73846ff0"
+  inputs-digest = "fe9b1778671f0812295fd178543b57166a6528a1cb5150cc93df960ff8da5d77"
   solver-name = "gps-cdcl"
   solver-version = 1

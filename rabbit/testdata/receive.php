@@ -12,4 +12,8 @@ if (!empty($test['info'])) {
     file_put_contents('php://stdout', $test['info']);
 }
 
+if (!empty($test['sleep'])) {
+    usleep($test['sleep']);
+}
+
 exit($test['exitcode']);
