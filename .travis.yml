@@ -2,7 +2,7 @@ language: go
 go: 1.8.1
 sudo: required
 services:
-  - rabbitmq
+  - docker
 
 install: make setup
 script: make ci

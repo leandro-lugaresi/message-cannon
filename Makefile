@@ -11,7 +11,7 @@ setup: ## Install all the build and lint dependencies
 	gometalinter --install --update
 
 test: ## Run all the tests
-	gotestcover $(TEST_OPTIONS) -covermode=atomic -coverprofile=coverage.txt $(SOURCE_FILES) -run $(TEST_PATTERN) -timeout=30s
+	gotestcover $(TEST_OPTIONS) -covermode=atomic -coverprofile=coverage.txt $(SOURCE_FILES) -run $(TEST_PATTERN) -timeout=1m
 
 cover: test ## Run all the tests and opens the coverage report
 	touch coverage.out

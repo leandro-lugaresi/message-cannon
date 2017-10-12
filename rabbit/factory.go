@@ -28,7 +28,7 @@ type Factory struct {
 func NewFactory(config Config, log *zap.Logger) (*Factory, error) {
 	conns := make(map[string]*amqp.Connection)
 	for name, cfgConn := range config.Connections {
-		conn, err := amqp.Dial(cfgConn.DSN)
+		conn, err := openConnection(cfgConn.DSN, 3, time.Second)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error opening the connection \"%s\"", name)
 		}
@@ -85,22 +85,20 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 
 	f.log.Debug("opening one connection channel", zap.String("connection", cfg.Connection))
 	var ch *amqp.Channel
-	err := retry.Do(func() error {
-		var err error
-		conn := f.conns[cfg.Connection]
-		ch, err = conn.Channel()
-		if err != nil && err.Error() == amqp.ErrClosed.Error() {
-			cfgConn := f.config.Connections[cfg.Connection]
-			conn, errDial := amqp.Dial(cfgConn.DSN)
-			if errDial != nil {
-				return errors.Wrapf(errDial, "error reopening the connection \"%s\"", cfg.Connection)
-			}
-			f.conns[cfg.Connection] = conn
+	var errCH error
+	conn := f.conns[cfg.Connection]
+	ch, errCH = conn.Channel()
+	if errCH != nil && errCH.Error() == amqp.ErrClosed.Error() {
+		cfgConn := f.config.Connections[cfg.Connection]
+		conn, err := openConnection(cfgConn.DSN, 5, time.Second)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error reopening the connection \"%s\"", cfg.Connection)
 		}
-		return err
-	}, 3, time.Second)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open the rabbitMQ channel")
+		f.conns[cfg.Connection] = conn
+		ch, errCH = conn.Channel()
+	}
+	if errCH != nil {
+		return nil, errors.Wrap(errCH, "failed to open the rabbitMQ channel")
 	}
 
 	f.log.Debug("declaring a queue", zap.String("queue", cfg.Queue.Name), zap.String("consumer", name))
@@ -186,4 +184,14 @@ func (f *Factory) declareExchange(ch *amqp.Channel, name string) error {
 		return errors.Wrapf(err, "failed to declare the exchange %s", name)
 	}
 	return nil
+}
+
+func openConnection(dsn string, retries int, sleep time.Duration) (*amqp.Connection, error) {
+	var conn *amqp.Connection
+	err := retry.Do(func() error {
+		var err error
+		conn, err = amqp.Dial(dsn)
+		return err
+	}, retries, sleep)
+	return conn, err
 }
