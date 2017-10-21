@@ -89,19 +89,19 @@ func (m *Manager) Stop() error {
 func (m *Manager) checkConsumers() {
 	tick := time.Tick(m.checkAliveness)
 	for range tick {
-		m.logger.Debug("Sending check operation")
 		m.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
 			for name, c := range consumers {
 				if !c.Alive() {
+					m.logger.Info("Recreating the consumer ", zap.String("consumer-name", name))
 					delete(consumers, name)
 					f, ok := factories[c.FactoryName()]
 					if !ok {
 						m.logger.Warn("Factory did not exist anymore",
 							zap.String("factory-name", c.FactoryName()),
-							zap.String("consumer-name", c.Name()))
+							zap.String("consumer-name", name))
 						continue
 					}
-					c, err := f.CreateConsumer(name)
+					nc, err := f.CreateConsumer(name)
 					if err != nil {
 						m.logger.Error("Error recreating one consumer",
 							zap.Error(err),
@@ -109,11 +109,10 @@ func (m *Manager) checkConsumers() {
 							zap.String("consumer-name", c.Name()))
 						continue
 					}
-					consumers[c.Name()] = c
-					c.Run()
+					consumers[name] = nc
+					nc.Run()
 				}
 			}
-			m.logger.Debug("check operation finished")
 		}
 	}
 }
