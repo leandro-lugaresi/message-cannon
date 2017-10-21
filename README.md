@@ -31,7 +31,7 @@ Status codes:
 -  `3`: ExitNACK
 -  `4`: ExitNACKRequeue
 -  `5`: ExitRetry
-> WARNING: This method is only possible if your number os messages are low! Open system process for every single message will cost some resources. If a number of messages are bigger try solve your issues with php (good luck) or rewrite in a better language.
+> WARNING: This method is only possible if your number of messages are low! Open system process for every single message will cost some resources. If a number of messages are bigger try solve your issues with php (good luck) or rewrite in a better language.
 
 ---
 

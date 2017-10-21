@@ -26,7 +26,7 @@ func TestIntegrationSuite(t *testing.T) {
 	// -> Setup
 	dockerPool, err := dockertest.NewPool("")
 	require.NoError(t, err, "Coud not connect to docker")
-	resource, err := dockerPool.Run("rabbitmq", "3.6.12-management", []string{"MYSQL_ROOT_PASSWORD=secret"})
+	resource, err := dockerPool.Run("rabbitmq", "3.6.12-management", []string{})
 	require.NoError(t, err, "Could not start resource")
 	config := getConfig(t, "valid_queue_and_exchange_config.yml")
 	cfg := config.Connections["default"]
@@ -45,7 +45,8 @@ func TestIntegrationSuite(t *testing.T) {
 			conn.DSN = "amqp://guest:guest@localhost:80/"
 			c.Connections["default"] = conn
 			_, err := NewFactory(c, zap.NewNop())
-			assert.EqualError(t, err, "error opening the connection \"default\": dial tcp [::1]:80: getsockopt: connection refused")
+			require.NotNil(t, err)
+			assert.Contains(t, err.Error(), "error opening the connection \"default\": ")
 		})
 		t.Run("when we pass an invalid host", func(t *testing.T) {
 			t.Skipf("Need to implement timeout")
@@ -152,7 +153,8 @@ func TestIntegrationSuite(t *testing.T) {
 		sendMessages(t, resource, "upload-picture", "android.profile.upload", 4, 6)
 		// wait the supervisor restart the consumer
 		time.Sleep(1 * time.Second)
-
+		err = sup.Stop()
+		require.NoError(t, err, "Failed to close the supervisor")
 		// Verify the log output
 		err = w.Close()
 		require.NoError(t, err, "Failed closing the pipe")
