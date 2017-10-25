@@ -1,6 +1,7 @@
 package rabbit
 
 import (
+	"net"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -28,7 +29,7 @@ type Factory struct {
 func NewFactory(config Config, log *zap.Logger) (*Factory, error) {
 	conns := make(map[string]*amqp.Connection)
 	for name, cfgConn := range config.Connections {
-		conn, err := openConnection(cfgConn.DSN, 3, time.Second)
+		conn, err := openConnection(cfgConn.DSN, 3, cfgConn.Sleep, cfgConn.Timeout)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error opening the connection \"%s\"", name)
 		}
@@ -90,7 +91,7 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	ch, errCH = conn.Channel()
 	if errCH != nil && errCH.Error() == amqp.ErrClosed.Error() {
 		cfgConn := f.config.Connections[cfg.Connection]
-		conn, err := openConnection(cfgConn.DSN, 5, time.Second)
+		conn, err := openConnection(cfgConn.DSN, 5, cfgConn.Sleep, cfgConn.Timeout)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reopening the connection \"%s\"", cfg.Connection)
 		}
@@ -186,11 +187,15 @@ func (f *Factory) declareExchange(ch *amqp.Channel, name string) error {
 	return nil
 }
 
-func openConnection(dsn string, retries int, sleep time.Duration) (*amqp.Connection, error) {
+func openConnection(dsn string, retries int, sleep, timeout time.Duration) (*amqp.Connection, error) {
 	var conn *amqp.Connection
 	err := retry.Do(func() error {
 		var err error
-		conn, err = amqp.Dial(dsn)
+		conn, err = amqp.DialConfig(dsn, amqp.Config{
+			Dial: func(network, addr string) (net.Conn, error) {
+				return net.DialTimeout(network, addr, timeout)
+			},
+		})
 		return err
 	}, retries, sleep)
 	return conn, err

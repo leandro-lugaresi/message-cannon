@@ -49,12 +49,11 @@ func TestIntegrationSuite(t *testing.T) {
 			assert.Contains(t, err.Error(), "error opening the connection \"default\": ")
 		})
 		t.Run("when we pass an invalid host", func(t *testing.T) {
-			t.Skipf("Need to implement timeout")
 			conn := c.Connections["default"]
 			conn.DSN = "amqp://guest:guest@10.255.255.1:5672/"
 			c.Connections["default"] = conn
 			_, err := NewFactory(c, zap.NewNop())
-			assert.EqualError(t, err, "error opening the connection \"default\": connection timeout")
+			assert.EqualError(t, err, "error opening the connection \"default\": dial tcp 10.255.255.1:5672: i/o timeout")
 		})
 	})
 	t.Run("TestFactory", func(t *testing.T) {
