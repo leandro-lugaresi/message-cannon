@@ -248,6 +248,12 @@
   revision = "c01e4764d870b77f8abe5096ee19ad20d80e8075"
 
 [[projects]]
+  name = "gopkg.in/mcuadros/go-defaults.v1"
+  packages = ["."]
+  revision = "ac8540f0fc7e0fb5f1eb9e25c6fd0b8db8f97eed"
+  version = "v1.1.0"
+
+[[projects]]
   name = "gopkg.in/ory-am/dockertest.v3"
   packages = ["."]
   revision = "6d57cd43b964e928111542771659af6a3a58521f"
@@ -268,6 +274,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "20be2a420066030302515cf8c9565ebd639904ccce0555cca4b368e776f4d0b3"
+  inputs-digest = "8124d20ccda7a1287df58a7cd8881ad62d27e53ac4a36645da8d0d62c8704297"
   solver-name = "gps-cdcl"
   solver-version = 1
