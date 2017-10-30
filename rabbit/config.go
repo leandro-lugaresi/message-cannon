@@ -35,8 +35,9 @@ type Consumers map[string]ConsumerConfig
 
 // Connection describe a config for one connection.
 type Connection struct {
-	DSN            string        `mapstructure:"dsn"`
-	ReconnectDelay time.Duration `mapstructure:"reconnect_delay"`
+	DSN     string        `mapstructure:"dsn"`
+	Timeout time.Duration `mapstructure:"timeout" default:"2s"`
+	Sleep   time.Duration `mapstructure:"sleep" default:"500ms"`
 }
 
 // ConsumerConfig describes consumer's configuration.

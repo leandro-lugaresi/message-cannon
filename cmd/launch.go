@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
+	"gopkg.in/mcuadros/go-defaults.v1"
 )
 
 // launchCmd represents the launch command
@@ -33,6 +34,7 @@ var launchCmd = &cobra.Command{
 		if viper.InConfig("rabbitmq") {
 			config := rabbit.Config{}
 			err = viper.UnmarshalKey("rabbitmq", &config)
+			defaults.SetDefaults(&config)
 			if err != nil {
 				log.Error("Error unmarshaling the config", zap.Error(err))
 				return errors.Wrap(err, "Problem unmarshaling your config into config struct")

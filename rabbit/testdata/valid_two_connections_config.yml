@@ -2,7 +2,8 @@ rabbitmq:
   connections:
     default:
       dsn: "amqp://localhost:5672"
-      reconnect_delay: 5s
+      timeout: 1s
+      sleep: 500ms
     test1:
       dsn: "amqp://localhost:5672"
   exchanges:
