@@ -18,20 +18,17 @@ const (
 
 // Config describes all available options for amqp connection creation.
 type Config struct {
+	// Connections describe the connections used by consumers.
 	Connections map[string]Connection `mapstructure:"connections"`
-	Consumers   Consumers             `mapstructure:"consumers"`
-	Exchanges   Exchanges             `mapstructure:"exchanges"`
+	// Exchanges have all the exchanges used by consumers.
+	// This exchanges are declared on startup of the rabbitMQ factory.
+	Exchanges map[string]ExchangeConfig `mapstructure:"exchanges"`
+	// DeadLetters have all the deadletters queues used internally by other queues
+	// This will be declared at startup of the rabbitMQ factory
+	DeadLetters map[string]DeadLetter `mapstructure:"dead_letters"`
+	// Consumers describes configuration list for consumers.
+	Consumers map[string]ConsumerConfig `mapstructure:"consumers"`
 }
-
-// Connections describe the connections used by consumers.
-type Connections map[string]Connection
-
-// Exchanges all the exchanges used by consumer.
-// This exchanges are declared on startup of the rabbitMQ factory.
-type Exchanges map[string]ExchangeConfig
-
-// Consumers describes configuration list for consumers.
-type Consumers map[string]ConsumerConfig
 
 // Connection describe a config for one connection.
 type Connection struct {
@@ -45,7 +42,7 @@ type ConsumerConfig struct {
 	Connection    string        `mapstructure:"connection"`
 	Workers       int           `mapstructure:"workers"`
 	PrefetchCount int           `mapstructure:"prefetch_count"`
-	PrefetchSize  int           `mapstructure:"prefetch_size"`
+	DeadLetter    string        `mapstructure:"dead_letter"`
 	Queue         QueueConfig   `mapstructure:"queue"`
 	Options       Options       `mapstructure:"options"`
 	Runner        runner.Config `mapstructure:"runner"`
@@ -55,6 +52,11 @@ type ConsumerConfig struct {
 type ExchangeConfig struct {
 	Type    string  `mapstructure:"type"`
 	Options Options `mapstructure:"options"`
+}
+
+// DeadLetter describe all the dead letters queues to be declared before declare other queues.
+type DeadLetter struct {
+	Queue QueueConfig `mapstructure:"queue"`
 }
 
 // QueueConfig describes queue's configuration.
