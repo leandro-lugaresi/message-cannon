@@ -2,7 +2,8 @@ rabbitmq:
   connections:
     default:
       dsn: "amqp://login:password@host:port/virtual_host"
-      reconnect_delay: 5s  # Interval between connection tries. Check https://golang.org/pkg/time/#ParseDuration for details.
+      timeout: 1s
+      sleep: 500ms
     another:
       # See https://www.rabbitmq.com/uri-spec.html on how to encode values.
       dsn: 'amqp://guest:password@localhost:5672/vhost?lazy=1&connection_timeout=6'

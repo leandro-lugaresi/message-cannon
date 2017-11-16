@@ -89,6 +89,7 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	var errCH error
 	conn := f.conns[cfg.Connection]
 	ch, errCH = conn.Channel()
+	// Reconnect the connection when receive an connection closed error
 	if errCH != nil && errCH.Error() == amqp.ErrClosed.Error() {
 		cfgConn := f.config.Connections[cfg.Connection]
 		conn, err := openConnection(cfgConn.DSN, 5, cfgConn.Sleep, cfgConn.Timeout)
@@ -101,42 +102,20 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	if errCH != nil {
 		return nil, errors.Wrap(errCH, "failed to open the rabbitMQ channel")
 	}
-
-	f.log.Debug("declaring a queue", zap.String("queue", cfg.Queue.Name), zap.String("consumer", name))
-	q, err := ch.QueueDeclare(
-		cfg.Queue.Name,
-		cfg.Queue.Options.Durable,
-		cfg.Queue.Options.AutoDelete,
-		cfg.Queue.Options.Exclusive,
-		cfg.Queue.Options.NoWait,
-		cfg.Queue.Options.Args)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to declare the queue \"%s\"", cfg.Queue.Name)
-	}
-
-	for _, b := range cfg.Queue.Bindings {
-		f.log.Debug("adding queue bind",
-			zap.String("queue", q.Name),
-			zap.String("consumer", name),
-			zap.String("exchange", b.Exchange))
-		err = f.declareExchange(ch, b.Exchange)
+	if len(cfg.DeadLetter) > 0 {
+		err := f.declareDeadLetters(ch, cfg.DeadLetter)
 		if err != nil {
 			return nil, err
 		}
-		for _, k := range b.RoutingKeys {
-			err = ch.QueueBind(q.Name, k, b.Exchange,
-				b.Options.NoWait, b.Options.Args)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to bind the queue \"%s\" to exchange: \"%s\"", q.Name, b.Exchange)
-			}
-		}
 	}
-
+	err := f.declareQueue(ch, cfg.Queue)
+	if err != nil {
+		return nil, err
+	}
 	f.log.Debug("setting QoS",
 		zap.Int("count", cfg.PrefetchCount),
-		zap.Int("size", cfg.PrefetchSize),
 		zap.String("consumer", name))
-	if err = ch.Qos(cfg.PrefetchCount, cfg.PrefetchSize, false); err != nil {
+	if err := ch.Qos(cfg.PrefetchCount, 0, false); err != nil {
 		return nil, errors.Wrap(err, "failed to set QoS")
 	}
 	hash := hashids.New()
@@ -180,11 +159,54 @@ func (f *Factory) declareExchange(ch *amqp.Channel, name string) error {
 		ex.Options.AutoDelete,
 		ex.Options.Internal,
 		ex.Options.NoWait,
-		ex.Options.Args)
-	if nil != err {
+		assertRightTableTypes(ex.Options.Args))
+	if err != nil {
 		return errors.Wrapf(err, "failed to declare the exchange %s", name)
 	}
 	return nil
+}
+
+func (f *Factory) declareQueue(ch *amqp.Channel, queue QueueConfig) error {
+	f.log.Debug("declaring a queue", zap.String("queue", queue.Name))
+	q, err := ch.QueueDeclare(
+		queue.Name,
+		queue.Options.Durable,
+		queue.Options.AutoDelete,
+		queue.Options.Exclusive,
+		queue.Options.NoWait,
+		assertRightTableTypes(queue.Options.Args))
+	if err != nil {
+		return errors.Wrapf(err, "failed to declare the queue \"%s\"", queue.Name)
+	}
+
+	for _, b := range queue.Bindings {
+		f.log.Debug("adding queue bind",
+			zap.String("queue", q.Name),
+			zap.String("exchange", b.Exchange))
+		err = f.declareExchange(ch, b.Exchange)
+		if err != nil {
+			return err
+		}
+		for _, k := range b.RoutingKeys {
+			err = ch.QueueBind(q.Name, k, b.Exchange,
+				b.Options.NoWait, assertRightTableTypes(b.Options.Args))
+			if err != nil {
+				return errors.Wrapf(err, "failed to bind the queue \"%s\" to exchange: \"%s\"", q.Name, b.Exchange)
+			}
+		}
+	}
+	return nil
+}
+
+func (f *Factory) declareDeadLetters(ch *amqp.Channel, name string) error {
+	f.log.Debug("declaring a deadletter", zap.String("deadletter", name))
+	dead, ok := f.config.DeadLetters[name]
+	if !ok {
+		f.log.Warn("deadletter config didn't exist, we will try to continue")
+		return nil
+	}
+	err := f.declareQueue(ch, dead.Queue)
+	return errors.Wrapf(err, "failed to declare the queue for deadletter %s", name)
 }
 
 func openConnection(dsn string, retries int, sleep, timeout time.Duration) (*amqp.Connection, error) {
@@ -199,4 +221,14 @@ func openConnection(dsn string, retries int, sleep, timeout time.Duration) (*amq
 		return err
 	}, retries, sleep)
 	return conn, err
+}
+
+func assertRightTableTypes(args amqp.Table) amqp.Table {
+	for k, v := range args {
+		switch v := v.(type) {
+		case int:
+			args[k] = int64(v)
+		}
+	}
+	return args
 }

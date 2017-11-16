@@ -41,7 +41,7 @@
   branch = "master"
   name = "github.com/docker/docker"
   packages = ["api/types","api/types/blkiodev","api/types/container","api/types/filters","api/types/mount","api/types/network","api/types/registry","api/types/strslice","api/types/swarm","api/types/swarm/runtime","api/types/versions","opts","pkg/archive","pkg/fileutils","pkg/homedir","pkg/idtools","pkg/ioutils","pkg/jsonmessage","pkg/longpath","pkg/mount","pkg/pools","pkg/stdcopy","pkg/system","pkg/term","pkg/term/windows"]
-  revision = "239d61f04bf1c00273c1c89b531fe37993e08a9f"
+  revision = "ba99c19b593bdb9e7b90793681fe89b0a91781ed"
 
 [[projects]]
   name = "github.com/docker/go-connections"
@@ -62,10 +62,10 @@
   version = "v1.4.2"
 
 [[projects]]
-  branch = "master"
   name = "github.com/fsouza/go-dockerclient"
   packages = ["."]
-  revision = "5c271fbf9db00b7011f28131e150e29725b8a1a6"
+  revision = "ec5bc638fffd03d2a471db3ccfc9afada35bb0f8"
+  version = "1.0"
 
 [[projects]]
   name = "github.com/gogo/protobuf"
@@ -161,7 +161,7 @@
   branch = "master"
   name = "github.com/spf13/afero"
   packages = [".","mem"]
-  revision = "e67d870304c4bca21331b02f414f970df13aa694"
+  revision = "5660eeed305fe5f69c8fc6cf899132a459a97064"
 
 [[projects]]
   name = "github.com/spf13/cast"
@@ -173,7 +173,7 @@
   branch = "master"
   name = "github.com/spf13/cobra"
   packages = ["."]
-  revision = "7b2c5ac9fc04fc5efafb60700713d4fa609b777b"
+  revision = "b3426bbac13d7110c4d8fce456ea0012f79f3b8b"
 
 [[projects]]
   branch = "master"
@@ -227,25 +227,25 @@
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
-  revision = "ed5229da99e3a6df35c756cd64b6982d19505d86"
+  revision = "bd6f299fb381e4c3393d1c4b1f0b94f5e77650c8"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","context/ctxhttp"]
-  revision = "1087133bc4af3073e18add999345c6ae75918503"
+  revision = "c73622c77280266305273cb545f54516ced95b93"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix","windows"]
-  revision = "8dbc5d05d6edcc104950cc299a1ce6641235bc86"
+  revision = "95c6576299259db960f6c5b9b69ea52422860fce"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
   packages = ["internal/gen","internal/triegen","internal/ucd","transform","unicode/cldr","unicode/norm"]
-  revision = "c01e4764d870b77f8abe5096ee19ad20d80e8075"
+  revision = "3cfc6c0d6bf80d724d98c26c4822f4a35d37598e"
 
 [[projects]]
   name = "gopkg.in/mcuadros/go-defaults.v1"
