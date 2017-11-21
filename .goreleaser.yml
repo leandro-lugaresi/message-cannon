@@ -1,5 +1,35 @@
-release:
-  draft: true
-build:
+builds:
+- goos:
+  - linux
+  - darwin
+  - windows
   goarch:
-    - amd64
+  - amd64
+  - "386"
+
+fpm:
+  homepage:  https://github.com/leandro-lugaresi/message-cannon
+  description: Consume rabbitMQ messages and send to any cli program
+  maintainer: Leandro Lugaresi <leandrolugaresi92@gmail.com>
+  license: MIT
+  vendor: Leandro Lugaresi
+  formats:
+    - deb
+    - rpm
+snapcraft:
+  summary: Consume rabbitMQ messages and send to any cli program
+  description: Consume rabbitMQ messages and send to any cli program
+  grade: stable
+  confinement: strict
+  apps:
+    # The name of the app must be the same name as the binary built.
+    drumroll:
+      # If your app requires extra permissions to work outside of its default
+      # confined space, delcare them here.
+      # You can read the documentation about the available plugs and the
+      # things they allow:
+      # https://snapcraft.io/docs/reference/interfaces).
+      plugs: ["home", "network"]
+      # If you want your app to be autostarted and to always run in the
+      # background, you can make it a simple daemon.
+      daemon: simple
