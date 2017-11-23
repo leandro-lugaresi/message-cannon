@@ -138,6 +138,7 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 		t:           tomb.Tomb{},
 		runner:      runner,
 		l:           f.log.With(zap.String("consumer", name)),
+		throttle:    make(chan struct{}, cfg.Workers),
 	}, nil
 }
 

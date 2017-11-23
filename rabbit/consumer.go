@@ -3,6 +3,7 @@ package rabbit
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"gopkg.in/tomb.v2"
 
@@ -16,6 +17,7 @@ type consumer struct {
 	hash        string
 	name        string
 	queue       string
+	throttle    chan struct{}
 	factoryName string
 	opts        Options
 	channel     *amqp.Channel
@@ -44,17 +46,27 @@ func (c *consumer) Run() {
 		}
 		dying := c.t.Dying()
 		closed := c.channel.NotifyClose(make(chan *amqp.Error))
+		var wg sync.WaitGroup
 		for {
 			select {
 			case <-dying:
+				wg.Wait()
 				return nil
 			case err := <-closed:
+				// Don't wait running process because the rabbitMQ is already closed.
+				// TODO: add support to close the processMessages using a context, currently we are using a context.Backgroud.
 				return err
 			case msg := <-d:
 				if msg.Acknowledger == nil {
 					return errors.New("receive an empty delivery")
 				}
-				c.processMessage(msg)
+				c.throttle <- struct{}{}
+				wg.Add(1)
+				go func(msg amqp.Delivery) {
+					c.processMessage(msg)
+					<-c.throttle
+					wg.Done()
+				}(msg)
 			}
 		}
 	})
@@ -96,8 +108,8 @@ func (c *consumer) processMessage(msg amqp.Delivery) {
 	case runner.ExitNACK:
 		err = msg.Nack(false, false)
 	default:
-		c.l.Warn("The runner return an unexpected exitStatus and the message will be rejected.", zap.Int("status", status))
-		err = msg.Reject(false)
+		c.l.Warn("The runner return an unexpected exitStatus and the message will be requeued.", zap.Int("status", status))
+		err = msg.Reject(true)
 	}
 	if err != nil {
 		c.l.Error("Error during the acknowledgement phase", zap.Error(err))
