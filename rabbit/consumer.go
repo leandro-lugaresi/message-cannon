@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"gopkg.in/tomb.v2"
 
@@ -18,6 +19,7 @@ type consumer struct {
 	name        string
 	queue       string
 	throttle    chan struct{}
+	timeout     time.Duration
 	factoryName string
 	opts        Options
 	channel     *amqp.Channel
@@ -46,26 +48,30 @@ func (c *consumer) Run() {
 		}
 		dying := c.t.Dying()
 		closed := c.channel.NotifyClose(make(chan *amqp.Error))
+		ctx, cancel := context.WithCancel(context.Background())
 		var wg sync.WaitGroup
 		for {
 			select {
 			case <-dying:
 				wg.Wait()
+				cancel()
 				return nil
 			case err := <-closed:
-				// Don't wait running process because the rabbitMQ is already closed.
-				// TODO: add support to close the processMessages using a context, currently we are using a context.Backgroud.
+				cancel()
 				return err
 			case msg := <-d:
 				if msg.Acknowledger == nil {
+					cancel()
 					return errors.New("receive an empty delivery")
 				}
 				c.throttle <- struct{}{}
 				wg.Add(1)
 				go func(msg amqp.Delivery) {
-					c.processMessage(msg)
+					nctx, canc := context.WithTimeout(ctx, c.timeout)
+					c.processMessage(nctx, msg)
 					<-c.throttle
 					wg.Done()
+					canc()
 				}(msg)
 			}
 		}
@@ -95,8 +101,8 @@ func (c *consumer) FactoryName() string {
 	return c.factoryName
 }
 
-func (c *consumer) processMessage(msg amqp.Delivery) {
-	status := c.runner.Process(context.Background(), msg.Body)
+func (c *consumer) processMessage(ctx context.Context, msg amqp.Delivery) {
+	status := c.runner.Process(ctx, msg.Body)
 	var err error
 	switch status {
 	case runner.ExitACK:
