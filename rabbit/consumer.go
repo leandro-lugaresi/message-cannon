@@ -49,29 +49,34 @@ func (c *consumer) Run() {
 		dying := c.t.Dying()
 		closed := c.channel.NotifyClose(make(chan *amqp.Error))
 		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		var wg sync.WaitGroup
 		for {
 			select {
 			case <-dying:
 				wg.Wait()
-				cancel()
 				return nil
 			case err := <-closed:
-				cancel()
 				return err
 			case msg := <-d:
+				c.l.Info("receive one message", zap.Uint64("tag", msg.DeliveryTag))
 				if msg.Acknowledger == nil {
-					cancel()
 					return errors.New("receive an empty delivery")
 				}
 				c.throttle <- struct{}{}
 				wg.Add(1)
 				go func(msg amqp.Delivery) {
-					nctx, canc := context.WithTimeout(ctx, c.timeout)
+					nctx := ctx
+					if c.timeout >= time.Second {
+						var canc context.CancelFunc
+						nctx, canc = context.WithTimeout(ctx, c.timeout)
+						defer canc()
+					}
+					c.l.Info("start processing", zap.Uint64("tag", msg.DeliveryTag))
 					c.processMessage(nctx, msg)
+					c.l.Info("finish processing", zap.Uint64("tag", msg.DeliveryTag))
 					<-c.throttle
 					wg.Done()
-					canc()
 				}(msg)
 			}
 		}

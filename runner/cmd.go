@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"syscall"
+	"time"
 
 	"os/exec"
 
@@ -37,9 +38,10 @@ type Options struct {
 
 // Config is an composition of all options and configurations used by this runnables.
 type Config struct {
-	Type         string  `mapstructure:"type"`
-	IgnoreOutput bool    `mapstructure:"ignore-output"`
-	Options      Options `mapstructure:"options"`
+	Type         string        `mapstructure:"type"`
+	IgnoreOutput bool          `mapstructure:"ignore-output"`
+	Options      Options       `mapstructure:"options"`
+	Timeout      time.Duration `mapstructure:"timeout" default:"-2s"`
 }
 
 type command struct {

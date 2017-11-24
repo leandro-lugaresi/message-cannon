@@ -40,7 +40,7 @@ type Connection struct {
 // ConsumerConfig describes consumer's configuration.
 type ConsumerConfig struct {
 	Connection    string        `mapstructure:"connection"`
-	Workers       int           `mapstructure:"workers"`
+	Workers       int           `mapstructure:"workers" default:"1"`
 	PrefetchCount int           `mapstructure:"prefetch_count"`
 	DeadLetter    string        `mapstructure:"dead_letter"`
 	Queue         QueueConfig   `mapstructure:"queue"`
