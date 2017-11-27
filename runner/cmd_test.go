@@ -32,15 +32,14 @@ func Test_command_Process(t *testing.T) {
 			"Command with exit 1",
 			args{[]byte(`{"exitcode": 1, "delay": 100000, "error": "Something is wrong :o"}`), false},
 			1,
-			[]string{`"level":"error","msg":"","output":"Something is wrong :o"`},
+			[]string{`"level":"error","msg":"Receive an error from command","error":"exit status 1","output":"Something is wrong :o"`},
 		},
 		{
 			"Command with php exception",
 			args{[]byte(`{"delay": 2000000, "exception": "Something is wrong :o"}`), false},
 			255,
 			[]string{
-				`"level":"error","msg":"","output":"PHP Fatal error:  `,
-				`"level":"error","msg":"Receive an error from command","error":"exit status 255"`,
+				`"level":"error","msg":"Receive an error from command","error":"exit status 255","output":"PHP Fatal error:  Uncaught Exception: Something is wrong :o`,
 			},
 		},
 		{
@@ -59,11 +58,9 @@ func Test_command_Process(t *testing.T) {
 			os.Stdout = w
 			logger := zap.NewExample()
 			c := &command{
-				cmd:          "testdata/receive.php",
-				args:         []string{},
-				stdErrLogger: &logwriter{logger, zap.ErrorLevel},
-				stdOutLogger: &logwriter{logger, zap.InfoLevel},
-				l:            logger,
+				cmd:  "testdata/receive.php",
+				args: []string{},
+				l:    logger,
 			}
 			ctx := context.Background()
 			if tt.args.timeout {
@@ -115,9 +112,8 @@ func TestNew(t *testing.T) {
 			&command{
 				cmd:          "/usr/bin/tail",
 				args:         []string{"-f"},
-				stdErrLogger: ioutil.Discard,
-				stdOutLogger: ioutil.Discard,
 				l:            logger,
+				ignoreOutput: true,
 			}, false, "",
 		},
 		{
@@ -129,15 +125,7 @@ func TestNew(t *testing.T) {
 			},
 			&command{
 				cmd: "testdata/receive.php",
-				stdErrLogger: &logwriter{
-					level: zap.ErrorLevel,
-					log:   logger,
-				},
-				stdOutLogger: &logwriter{
-					level: zap.InfoLevel,
-					log:   logger,
-				},
-				l: logger,
+				l:   logger,
 			}, false, "",
 		},
 	}
