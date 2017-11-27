@@ -50,7 +50,6 @@ func NewFactory(config Config, log *zap.Logger) (*Factory, error) {
 func (f *Factory) CreateConsumers() ([]supervisor.Consumer, error) {
 	var consumers []supervisor.Consumer
 	for name, cfg := range f.config.Consumers {
-		defaults.SetDefaults(&cfg)
 		consumer, err := f.newConsumer(name, cfg)
 		if err != nil {
 			return consumers, err
@@ -75,6 +74,7 @@ func (f *Factory) Name() string {
 }
 
 func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error) {
+	defaults.SetDefaults(&cfg)
 	_, ok := f.conns[cfg.Connection]
 	if !ok {
 		available := []string{}
