@@ -39,7 +39,7 @@ func Test_command_Process(t *testing.T) {
 			args{[]byte(`{"delay": 2000000, "exception": "Something is wrong :o"}`), false},
 			255,
 			[]string{
-				`"level":"error","msg":"Receive an error from command","error":"exit status 255","output":"PHP Fatal error:  Uncaught Exception: Something is wrong :o`,
+				`"level":"error","msg":"Receive an error from command","error":"exit status 255","output":"PHP Fatal error:`,
 			},
 		},
 		{
