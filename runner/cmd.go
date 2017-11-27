@@ -41,7 +41,7 @@ type Config struct {
 	Type         string        `mapstructure:"type"`
 	IgnoreOutput bool          `mapstructure:"ignore-output"`
 	Options      Options       `mapstructure:"options"`
-	Timeout      time.Duration `mapstructure:"timeout" default:"-2s"`
+	Timeout      time.Duration `mapstructure:"timeout"`
 }
 
 type command struct {

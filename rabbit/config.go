@@ -41,7 +41,7 @@ type Connection struct {
 type ConsumerConfig struct {
 	Connection    string        `mapstructure:"connection"`
 	Workers       int           `mapstructure:"workers" default:"1"`
-	PrefetchCount int           `mapstructure:"prefetch_count"`
+	PrefetchCount int           `mapstructure:"prefetch_count" default:"5"`
 	DeadLetter    string        `mapstructure:"dead_letter"`
 	Queue         QueueConfig   `mapstructure:"queue"`
 	Options       Options       `mapstructure:"options"`

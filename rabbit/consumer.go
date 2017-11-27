@@ -59,7 +59,6 @@ func (c *consumer) Run() {
 			case err := <-closed:
 				return err
 			case msg := <-d:
-				c.l.Info("receive one message", zap.Uint64("tag", msg.DeliveryTag))
 				if msg.Acknowledger == nil {
 					return errors.New("receive an empty delivery")
 				}
@@ -72,9 +71,7 @@ func (c *consumer) Run() {
 						nctx, canc = context.WithTimeout(ctx, c.timeout)
 						defer canc()
 					}
-					c.l.Info("start processing", zap.Uint64("tag", msg.DeliveryTag))
 					c.processMessage(nctx, msg)
-					c.l.Info("finish processing", zap.Uint64("tag", msg.DeliveryTag))
 					<-c.throttle
 					wg.Done()
 				}(msg)
