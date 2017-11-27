@@ -2,11 +2,10 @@ package runner
 
 import (
 	"context"
-	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"syscall"
+	"time"
 
 	"os/exec"
 
@@ -37,17 +36,17 @@ type Options struct {
 
 // Config is an composition of all options and configurations used by this runnables.
 type Config struct {
-	Type         string  `mapstructure:"type"`
-	IgnoreOutput bool    `mapstructure:"ignore-output"`
-	Options      Options `mapstructure:"options"`
+	Type         string        `mapstructure:"type"`
+	IgnoreOutput bool          `mapstructure:"ignore-output"`
+	Options      Options       `mapstructure:"options"`
+	Timeout      time.Duration `mapstructure:"timeout"`
 }
 
 type command struct {
 	cmd          string
 	args         []string
-	stdErrLogger io.Writer
-	stdOutLogger io.Writer
 	l            *zap.Logger
+	ignoreOutput bool
 }
 
 func (c *command) Process(ctx context.Context, b []byte) int {
@@ -66,12 +65,9 @@ func (c *command) Process(ctx context.Context, b []byte) int {
 			c.l.Error("Failed closing stdin", zap.Error(err))
 		}
 	}()
-	cmd.Stderr = c.stdErrLogger
-	cmd.Stdout = c.stdOutLogger
-	err = cmd.Run()
-
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		c.l.Error("Receive an error from command", zap.Error(err))
+		c.l.Error("Receive an error from command", zap.Error(err), zap.ByteString("output", output))
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
 				return status.ExitStatus()
@@ -79,6 +75,9 @@ func (c *command) Process(ctx context.Context, b []byte) int {
 		}
 
 		return ExitFailed
+	}
+	if !c.ignoreOutput && len(output) > 0 {
+		c.l.Info("message processed with output", zap.ByteString("output", output))
 	}
 	return ExitACK
 }
@@ -107,18 +106,7 @@ func newCommand(log *zap.Logger, c Config) (*command, error) {
 		cmd:          c.Options.Path,
 		args:         c.Options.Args,
 		l:            log,
-		stdErrLogger: ioutil.Discard,
-		stdOutLogger: ioutil.Discard,
-	}
-	if !c.IgnoreOutput {
-		cmd.stdErrLogger = &logwriter{
-			level: zap.ErrorLevel,
-			log:   log,
-		}
-		cmd.stdOutLogger = &logwriter{
-			level: zap.InfoLevel,
-			log:   log,
-		}
+		ignoreOutput: c.IgnoreOutput,
 	}
 	return &cmd, nil
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/speps/go-hashids"
 	"github.com/streadway/amqp"
 	"go.uber.org/zap"
+	"gopkg.in/mcuadros/go-defaults.v1"
 )
 
 // Factory is the block responsible for create consumers and restart the rabbitMQ connections.
@@ -29,6 +30,7 @@ type Factory struct {
 func NewFactory(config Config, log *zap.Logger) (*Factory, error) {
 	conns := make(map[string]*amqp.Connection)
 	for name, cfgConn := range config.Connections {
+		defaults.SetDefaults(&cfgConn)
 		conn, err := openConnection(cfgConn.DSN, 3, cfgConn.Sleep, cfgConn.Timeout)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error opening the connection \"%s\"", name)
@@ -48,6 +50,7 @@ func NewFactory(config Config, log *zap.Logger) (*Factory, error) {
 func (f *Factory) CreateConsumers() ([]supervisor.Consumer, error) {
 	var consumers []supervisor.Consumer
 	for name, cfg := range f.config.Consumers {
+		defaults.SetDefaults(&cfg)
 		consumer, err := f.newConsumer(name, cfg)
 		if err != nil {
 			return consumers, err
@@ -128,6 +131,7 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create the runner")
 	}
+	f.log.Info("qtd of workers", zap.Int("workers", cfg.Workers), zap.String("name", name))
 	return &consumer{
 		queue:       cfg.Queue.Name,
 		name:        name,
@@ -138,6 +142,8 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 		t:           tomb.Tomb{},
 		runner:      runner,
 		l:           f.log.With(zap.String("consumer", name)),
+		throttle:    make(chan struct{}, cfg.Workers),
+		timeout:     cfg.Runner.Timeout,
 	}, nil
 }
 

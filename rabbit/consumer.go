@@ -3,6 +3,8 @@ package rabbit
 import (
 	"context"
 	"errors"
+	"sync"
+	"time"
 
 	"gopkg.in/tomb.v2"
 
@@ -16,6 +18,8 @@ type consumer struct {
 	hash        string
 	name        string
 	queue       string
+	throttle    chan struct{}
+	timeout     time.Duration
 	factoryName string
 	opts        Options
 	channel     *amqp.Channel
@@ -44,9 +48,13 @@ func (c *consumer) Run() {
 		}
 		dying := c.t.Dying()
 		closed := c.channel.NotifyClose(make(chan *amqp.Error))
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		var wg sync.WaitGroup
 		for {
 			select {
 			case <-dying:
+				wg.Wait()
 				return nil
 			case err := <-closed:
 				return err
@@ -54,7 +62,19 @@ func (c *consumer) Run() {
 				if msg.Acknowledger == nil {
 					return errors.New("receive an empty delivery")
 				}
-				c.processMessage(msg)
+				c.throttle <- struct{}{}
+				wg.Add(1)
+				go func(msg amqp.Delivery) {
+					nctx := ctx
+					if c.timeout >= time.Second {
+						var canc context.CancelFunc
+						nctx, canc = context.WithTimeout(ctx, c.timeout)
+						defer canc()
+					}
+					c.processMessage(nctx, msg)
+					<-c.throttle
+					wg.Done()
+				}(msg)
 			}
 		}
 	})
@@ -83,8 +103,8 @@ func (c *consumer) FactoryName() string {
 	return c.factoryName
 }
 
-func (c *consumer) processMessage(msg amqp.Delivery) {
-	status := c.runner.Process(context.Background(), msg.Body)
+func (c *consumer) processMessage(ctx context.Context, msg amqp.Delivery) {
+	status := c.runner.Process(ctx, msg.Body)
 	var err error
 	switch status {
 	case runner.ExitACK:
@@ -96,8 +116,8 @@ func (c *consumer) processMessage(msg amqp.Delivery) {
 	case runner.ExitNACK:
 		err = msg.Nack(false, false)
 	default:
-		c.l.Warn("The runner return an unexpected exitStatus and the message will be rejected.", zap.Int("status", status))
-		err = msg.Reject(false)
+		c.l.Warn("The runner return an unexpected exitStatus and the message will be requeued.", zap.Int("status", status))
+		err = msg.Reject(true)
 	}
 	if err != nil {
 		c.l.Error("Error during the acknowledgement phase", zap.Error(err))
