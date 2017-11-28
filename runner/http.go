@@ -32,7 +32,12 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 		p.l.Error("Failed when on request", zap.Error(err))
 		return ExitRetry
 	}
-	defer resp.Body.Close()
+	defer func() {
+		err := resp.Body.Close()
+		if err != nil {
+			p.l.Error("Error closing the response body", zap.Error(err))
+		}
+	}()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		p.l.Error("Error reading the request response body", zap.Error(err))
