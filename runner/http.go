@@ -13,7 +13,7 @@ import (
 
 type httpRunner struct {
 	url          string
-	contentType  string
+	headers      map[string]string
 	l            *zap.Logger
 	ignoreOutput bool
 	client       *http.Client
@@ -26,7 +26,9 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 		p.l.Error("Error creating one request", zap.Error(err))
 		return ExitRetry
 	}
-	req.Header.Set("Content-Type", p.contentType)
+	for k, v := range p.headers {
+		req.Header.Set(k, v)
+	}
 	resp, err := p.client.Do(req)
 	if err != nil {
 		p.l.Error("Failed when on request", zap.Error(err))
@@ -68,6 +70,7 @@ func newHTTP(log *zap.Logger, c Config) (*httpRunner, error) {
 		l:            log,
 		url:          c.Options.URL,
 		ignoreOutput: c.IgnoreOutput,
+		headers:      c.Options.Headers,
 		client: &http.Client{
 			Timeout: c.Timeout,
 			Transport: &http.Transport{

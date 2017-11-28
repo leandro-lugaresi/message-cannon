@@ -32,7 +32,9 @@ type Options struct {
 	Path string   `mapstructure:"path"`
 	Args []string `mapstructure:"args"`
 	// HTTP options
-	URL string `mapstructure:"url"`
+	URL        string `mapstructure:"url"`
+	RetryOn5xx int
+	Headers    map[string]string
 }
 
 // Config is an composition of options and configurations used by this runnables.
