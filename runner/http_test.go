@@ -44,7 +44,7 @@ func Test_httpRunner_Process(t *testing.T) {
 		}
 	})
 	go func() {
-		t.Fatal(http.ListenAndServe("localhost:8080", mux))
+		t.Error(http.ListenAndServe("localhost:8080", mux))
 	}()
 
 	tests := []struct {
@@ -86,7 +86,7 @@ func Test_httpRunner_Process(t *testing.T) {
 			os.Stdout = w
 			logger := zap.NewExample()
 			ctx := context.Background()
-			runner, err := newHTTP(logger, Config{
+			runner, err := New(logger, Config{
 				IgnoreOutput: false,
 				Type:         "http",
 				Timeout:      1 * time.Second,

@@ -12,11 +12,12 @@ import (
 )
 
 type httpRunner struct {
+	client       *http.Client
+	ignoreOutput bool
+	l            *zap.Logger
 	url          string
 	headers      map[string]string
-	l            *zap.Logger
-	ignoreOutput bool
-	client       *http.Client
+	returnOn5xx  int
 }
 
 func (p *httpRunner) Process(ctx context.Context, b []byte) int {
@@ -48,7 +49,7 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 		p.l.Error("Receive an 5xx error from request",
 			zap.Int("status-code", resp.StatusCode),
 			zap.ByteString("output", body))
-		return ExitNACKRequeue
+		return p.returnOn5xx
 	}
 	if resp.StatusCode >= 400 {
 		p.l.Error("Receive an 4xx error from request",
@@ -71,6 +72,7 @@ func newHTTP(log *zap.Logger, c Config) (*httpRunner, error) {
 		url:          c.Options.URL,
 		ignoreOutput: c.IgnoreOutput,
 		headers:      c.Options.Headers,
+		returnOn5xx:  c.Options.ReturnOn5xx,
 		client: &http.Client{
 			Timeout: c.Timeout,
 			Transport: &http.Transport{

@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"gopkg.in/mcuadros/go-defaults.v1"
 )
 
 // Exit constants used to know how handle the message.
@@ -32,9 +33,9 @@ type Options struct {
 	Path string   `mapstructure:"path"`
 	Args []string `mapstructure:"args"`
 	// HTTP options
-	URL        string `mapstructure:"url"`
-	RetryOn5xx int
-	Headers    map[string]string
+	URL         string `mapstructure:"url"`
+	ReturnOn5xx int    `mapstructure:"return-on-5xx" default:"4"`
+	Headers     map[string]string
 }
 
 // Config is an composition of options and configurations used by this runnables.
@@ -47,6 +48,8 @@ type Config struct {
 
 // New create and return a Runnable based on the config type. if the type didn't exist an error is returned.
 func New(log *zap.Logger, c Config) (Runnable, error) {
+	defaults.SetDefaults(&c)
+	defaults.SetDefaults(&c.Options)
 	switch c.Type {
 	case "command":
 		return newCommand(log, c)
