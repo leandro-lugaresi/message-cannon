@@ -46,7 +46,7 @@ func Test_httpRunner_Process(t *testing.T) {
 	go func() {
 		t.Error(http.ListenAndServe("localhost:8080", mux))
 	}()
-
+	time.Sleep(10 * time.Millisecond)
 	tests := []struct {
 		name       string
 		want       int
