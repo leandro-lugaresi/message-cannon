@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -57,13 +58,22 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 			zap.ByteString("output", body))
 		return ExitRetry
 	}
-	if !p.ignoreOutput && len(body) > 0 {
+	if p.ignoreOutput {
+		return ExitACK
+	}
+	content := struct {
+		ResponseCode int `json:"response-code"`
+	}{}
+	err = json.Unmarshal(body, &content)
+	if err != nil {
+		p.l.Warn("Failed to unmarshal the response", zap.Error(err))
+	}
+	if len(body) > 0 {
 		p.l.Info("message processed with output",
 			zap.Int("status-code", resp.StatusCode),
 			zap.ByteString("output", body))
 	}
-
-	return ExitACK
+	return content.ResponseCode
 }
 
 func newHTTP(log *zap.Logger, c Config) (*httpRunner, error) {
