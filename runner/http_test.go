@@ -44,7 +44,7 @@ func Test_httpRunner_Process(t *testing.T) {
 		}
 	})
 	go func() {
-		t.Error(http.ListenAndServe("localhost:8080", mux))
+		t.Error(http.ListenAndServe("localhost:8089", mux))
 	}()
 	time.Sleep(10 * time.Millisecond)
 	tests := []struct {
@@ -64,6 +64,11 @@ func Test_httpRunner_Process(t *testing.T) {
 			[]string{`{"level":"info","msg":"message processed with output","status-code":200,"output":"\"some random content here\""}`},
 		},
 		{
+			"200 with return-code", ExitNACK,
+			[]byte(`{"code":200, "contentType": "application/json", "message": {"response-code":3}}`),
+			[]string{`{"level":"info","msg":"message processed with output","status-code":200,"output":"{\"response-code\":3}"}`},
+		},
+		{
 			"404 not found should retry", ExitRetry,
 			[]byte(`{"code":404, "contentType": "text/html", "message": "some random content here"}`),
 			[]string{`{"level":"error","msg":"Receive an 4xx error from request","status-code":404,"output":"\"some random content here\""}`},
@@ -76,7 +81,7 @@ func Test_httpRunner_Process(t *testing.T) {
 		{
 			"request with timeout", ExitRetry,
 			[]byte(`{"sleep": 4000000000, "code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
-			[]string{`{"level":"error","msg":"Failed when on request","error":"Post http://localhost:8080: net/http: request canceled (Client.Timeout exceeded while awaiting headers)"}`},
+			[]string{`{"level":"error","msg":"Failed when on request","error":"Post http://localhost:8089: net/http: request canceled (Client.Timeout exceeded while awaiting headers)"}`},
 		},
 	}
 	for _, tt := range tests {
@@ -91,7 +96,7 @@ func Test_httpRunner_Process(t *testing.T) {
 				Type:         "http",
 				Timeout:      1 * time.Second,
 				Options: Options{
-					URL: "http://localhost:8080",
+					URL: "http://localhost:8089",
 				},
 			})
 			require.NoError(t, err)
