@@ -1,6 +1,6 @@
 FROM alpine
 
-ADD assets/ca-certificates.crt /etc/ssl/certs/
+RUN apk add --no-cache ca-certificates openssl
 COPY message-cannon /
 
 ENTRYPOINT ["/message-cannon"]
