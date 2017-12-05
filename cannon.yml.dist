@@ -19,13 +19,29 @@ rabbitmq:
       type: topic
       options:
         no_wait: false
-    other:
-      type: direct
+    fallback:
+      type: topic
+      options:
+        durable: true
+  dead_letters:
+    fallback:
+      queue:
+        name: fallback
+        options:
+          durable: false
+          args:
+            x-dead-letter-exchange: ""
+            x-message-ttl: 300000
+        bindings:
+          -
+            routing_keys: ["#"]
+            exchange: fallback
   consumers:
     upload_picture:
       connection: default
-      workers: 1                           # Workers count. Defaults to 1.
-      prefetch_count: 10                    # Prefetch message count per worker.
+      workers: 1                 # Number of concurrent messages processed. Defaults to 1.
+      prefetch_count: 10         # Prefetch message count per worker.
+      dead_letter: fallback
       queue:
         name: "upload-picture"
         options:
@@ -33,13 +49,16 @@ rabbitmq:
           durable: false
           exclusive: false
           no_wait: false
+          args:
+            x-dead-letter-exchange: fallback
+            x-dead-letter-routing-key: upload_picture
         bindings:
           -
             routing_keys:
               - 'android.#.upload'
               - 'iphone.upload'
             exchange: upload-picture
-      # Available options with default values:
+      # Consumer options available with default values:
       options:
         no_ack: false
         no_local: false
