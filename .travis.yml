@@ -18,6 +18,7 @@ before_deploy:
   - export PATH=/snap/bin:$PATH
   - which snap
   - sudo snap install snapcraft --candidate --classic
+  - docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD"
 deploy:
   skip_cleanup: true
   provider: script
