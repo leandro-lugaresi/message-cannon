@@ -26,13 +26,13 @@ func (c *command) Process(ctx context.Context, b []byte) int {
 		c.l.Error("Receive an error creating the stdin pipe", zap.Error(err))
 	}
 	go func() {
-		_, err := stdin.Write(b)
-		if err != nil {
-			c.l.Error("Failed writing to stdin", zap.Error(err))
+		_, pipeErr := stdin.Write(b)
+		if pipeErr != nil {
+			c.l.Error("Failed writing to stdin", zap.Error(pipeErr))
 		}
-		err = stdin.Close()
-		if err != nil {
-			c.l.Error("Failed closing stdin", zap.Error(err))
+		pipeErr = stdin.Close()
+		if pipeErr != nil {
+			c.l.Error("Failed closing stdin", zap.Error(pipeErr))
 		}
 	}()
 	output, err := cmd.CombinedOutput()
