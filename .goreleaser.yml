@@ -6,6 +6,8 @@ builds:
   goarch:
   - amd64
   - "386"
+  env:
+    - CGO_ENABLED=0
 
 fpm:
   homepage:  https://github.com/leandro-lugaresi/message-cannon
