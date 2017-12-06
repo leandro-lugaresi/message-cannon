@@ -39,12 +39,13 @@ var launchCmd = &cobra.Command{
 				log.Error("Error unmarshaling the config", zap.Error(err))
 				return errors.Wrap(err, "Problem unmarshaling your config into config struct")
 			}
-			rabbitF, err := rabbit.NewFactory(config, log)
+			var rFactory *rabbit.Factory
+			rFactory, err = rabbit.NewFactory(config, log)
 			if err != nil {
 				log.Error("Error creating the rabbitMQ factory", zap.Error(err))
 				return err
 			}
-			factories = append(factories, rabbitF)
+			factories = append(factories, rFactory)
 		}
 		err = sup.Start(factories)
 		if err != nil {

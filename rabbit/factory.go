@@ -118,7 +118,7 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	f.log.Debug("setting QoS",
 		zap.Int("count", cfg.PrefetchCount),
 		zap.String("consumer", name))
-	if err := ch.Qos(cfg.PrefetchCount, 0, false); err != nil {
+	if err = ch.Qos(cfg.PrefetchCount, 0, false); err != nil {
 		return nil, errors.Wrap(err, "failed to set QoS")
 	}
 	hash := hashids.New()
