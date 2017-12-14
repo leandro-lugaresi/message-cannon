@@ -51,7 +51,7 @@ rabbitmq:
           no_wait: false
           args:
             x-dead-letter-exchange: fallback
-            x-dead-letter-routing-key: upload_picture
+            x-dead-letter-routing-key: upload-picture
         bindings:
           -
             routing_keys:
