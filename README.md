@@ -91,6 +91,9 @@ We create some constants to represent some operations available to messages, eve
 
 You can see an example of config file [here](cannon.yml.dist)
 
+# License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fleandro-lugaresi%2Fmessage-cannon.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fleandro-lugaresi%2Fmessage-cannon?ref=badge_large)
+
 ---
 
 This project adheres to the Contributor Covenant [code of conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
