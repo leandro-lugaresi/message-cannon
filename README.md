@@ -13,6 +13,7 @@ Consume messages from message systems (RabbitMQ, NATS, Kafka) and send to other 
 
 ---
 
+# Motivation
 If you already tried to use some long running code with PHP you probably notice some problems like:
 - Doctrine connection closed;
 - Entities outdated;
@@ -21,6 +22,30 @@ If you already tried to use some long running code with PHP you probably notice 
 
 message-cannon is a binary used to solve this problem we faced in PHP projects.
 The idea is to run the consumers in a go binary and send the messages to callbacks using `runners`.
+
+# Installation
+
+## Docker
+The simple way to run message-cannon is to run the docker image for it. This is an example of docker-compose running the message-cannon:
+```
+  cannon:
+    image: leandrolugaresi/message-cannon:latest
+    volumes:
+      - ./app/config/cannon.yaml:/.cannon.yaml
+    command: launch --config=.cannon.yaml
+    links:
+      - rabbitmq
+      - my-app
+```
+
+## Manual
+You can get the binaries and use it. Just go to [releases](https://github.com/leandro-lugaresi/message-cannon/releases) and download the newest binary for your SO (deb, rpm, snap are also available)
+
+# Usage
+
+## Commands
+
+We have only one command: `message-cannon launch` will open one config file and start all the consumers availlable.
 
 ## Runners
 
@@ -90,6 +115,9 @@ We create some constants to represent some operations available to messages, eve
 ## Example of config file
 
 You can see an example of config file [here](cannon.yml.dist)
+
+# License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fleandro-lugaresi%2Fmessage-cannon.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fleandro-lugaresi%2Fmessage-cannon?ref=badge_large)
 
 ---
 
