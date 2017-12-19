@@ -1,26 +1,42 @@
 package events
 
 import (
-	"fmt"
-	"sync"
+	"context"
+	"log"
+
+	gendiodes "code.cloudfoundry.org/go-diodes"
 )
 
-// Level defines log levels.
+// Level defines log levels used internally.
 type Level uint8
 
-type Handler func(msg Message)
-
+// Field represent one key-value field passed with the log message.
 type Field struct {
 	key   string
 	value interface{}
 }
 
-// Logger defines the logger
-type Logger struct {
+// Message represet one log message.
+type Message struct {
+	Level  Level
+	Msg    string
+	Fields []Field
+}
+
+// Handler is the function used to process every message.
+type Handler func(msg Message)
+
+type core struct {
 	handler Handler
-	fields  []Field
-	events  chan Message
-	wg      sync.WaitGroup
+	diode   *manyToOneMessage
+	cancel  context.CancelFunc
+	done    chan struct{}
+}
+
+// Logger defines the logger struct used to send logs to an Handler.
+type Logger struct {
+	fields []Field
+	core   *core
 }
 
 const (
@@ -38,27 +54,38 @@ const (
 	PanicLevel
 )
 
-func NewLogger(handler Handler, cap int) *Logger {
-	l := &Logger{
-		events:  make(chan Message, cap),
-		handler: handler,
-	}
-	l.wg.Add(1)
-	go func(log *Logger) {
-		for msg := range log.events {
-			log.handler(msg)
+func (c *core) handle() {
+	for {
+		msg, closed := c.diode.Next()
+		if closed {
+			break
 		}
-		log.wg.Done()
-	}(l)
+		c.handler(msg)
+	}
+	c.done <- struct{}{}
+}
+
+// NewLogger returns a new Logger to be used to log messages.
+func NewLogger(handler Handler, cap int) *Logger {
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	l := &Logger{
+		core: &core{
+			handler: handler,
+			diode: newManyToOneMessage(
+				ctx,
+				cap,
+				gendiodes.AlertFunc(func(missed int) {
+					log.Printf("Dropped %d messages from log", missed)
+				})),
+			cancel: cancelFunc,
+			done:   make(chan struct{}, 1),
+		},
+	}
+	go l.core.handle()
 	return l
 }
 
-type Message struct {
-	Level  Level
-	Msg    string
-	Fields []Field
-}
-
+// Log will send the message in a non blocking way.
 func (l *Logger) Log(level Level, msg string, fields ...Field) {
 	fields = append(fields, l.fields...)
 	m := Message{
@@ -66,20 +93,18 @@ func (l *Logger) Log(level Level, msg string, fields ...Field) {
 		Msg:    msg,
 		Fields: fields,
 	}
-	select {
-	case l.events <- m:
-	default:
-		fmt.Println("Message dropped")
-	}
+	l.core.diode.Set(m)
 }
 
+// With return a new sub Logger with fields attached.
 func (l *Logger) With(fields ...Field) *Logger {
 	log := *l
 	log.fields = append(log.fields, fields...)
 	return &log
 }
 
+// Close will close the logger.
 func (l *Logger) Close() {
-	close(l.events)
-	l.wg.Wait()
+	l.core.cancel()
+	<-l.core.done
 }
