@@ -1,16 +1,18 @@
 package events
 
 import (
+	"io/ioutil"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
 func TestLogger_LogShouldSendAllLogsToHandler(t *testing.T) {
 	messsages := []Message{}
-	log := NewLogger(func(msg Message) {
+	log := NewLogger(HandlerFunc(func(msg Message) {
 		messsages = append(messsages, msg)
-	}, 10)
+	}), 10)
 	for i := 0; i < 10; i++ {
 		log.Log(WarnLevel, "test message", Field{"i", i}, Field{"priest", "wololo"})
 	}
@@ -29,9 +31,9 @@ func TestLogger_LogShouldSendAllLogsToHandler(t *testing.T) {
 
 func TestLogger_WithShouldCreateAnSubLoggerWithAllTheFields(t *testing.T) {
 	messsages := []Message{}
-	log := NewLogger(func(msg Message) {
+	log := NewLogger(HandlerFunc(func(msg Message) {
 		messsages = append(messsages, msg)
-	}, 10)
+	}), 10)
 	sub1 := log.With(Field{"foo", "baz"}, Field{"proc", "sub1"})
 	sub2 := log.With(Field{"foo", "baz"}, Field{"proc", "sub2"})
 	sub1.Log(InfoLevel, "test log sub1")
@@ -69,9 +71,19 @@ func TestLogger_WithShouldCreateAnSubLoggerWithAllTheFields(t *testing.T) {
 }
 
 func BenchmarkLogFirstLevel(b *testing.B) {
-	// run the Fib function b.N times
-	log := NewLogger(func(msg Message) {
-		return
+	log := NewLogger(NewNoOpHandler(), b.N)
+	for n := 0; n < b.N; n++ {
+		log.Log(InfoLevel, "message log for benchmark", Field{"n", n}, Field{"bench1", true})
+	}
+	log.Close()
+}
+
+func BenchmarkLogZeroLog(b *testing.B) {
+	log := NewLogger(&ZeroLogHandler{
+		log: zerolog.New(ioutil.Discard).With().
+			Timestamp().
+			Str("app", "message-cannon").
+			Logger(),
 	}, b.N)
 	for n := 0; n < b.N; n++ {
 		log.Log(InfoLevel, "message log for benchmark", Field{"n", n}, Field{"bench1", true})

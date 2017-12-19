@@ -23,8 +23,22 @@ type Message struct {
 	Fields []Field
 }
 
-// Handler is the function used to process every message.
-type Handler func(msg Message)
+// Handler represent and Logger handler.
+// This handler is responsible to send the every log registry to somewhere.
+type Handler interface {
+	// Handle will send the message to somewhere, this function didn't expect errors.
+	Handle(msg Message)
+	// Sync will flush the buffers, if any.
+	Sync()
+}
+
+// HandlerFunc is the function used to process every message.
+type HandlerFunc func(msg Message)
+
+func (h HandlerFunc) Handle(msg Message) {
+	h(msg)
+}
+func (h HandlerFunc) Sync() {}
 
 type core struct {
 	handler Handler
@@ -60,8 +74,9 @@ func (c *core) handle() {
 		if closed {
 			break
 		}
-		c.handler(msg)
+		c.handler.Handle(msg)
 	}
+	c.handler.Sync()
 	c.done <- struct{}{}
 }
 
@@ -107,4 +122,8 @@ func (l *Logger) With(fields ...Field) *Logger {
 func (l *Logger) Close() {
 	l.core.cancel()
 	<-l.core.done
+}
+
+func NewNoOpHandler() Handler {
+	return HandlerFunc(func(msg Message) {})
 }
