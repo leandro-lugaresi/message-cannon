@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var cfgFile string
@@ -30,24 +29,5 @@ func Execute(version, commit string) {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
-
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is .cannon.yaml)")
-}
-
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
-	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
-	} else {
-		viper.AddConfigPath(".")
-		viper.SetConfigName(".cannon")
-	}
-
-	viper.AutomaticEnv()
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
-	}
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", ".cannon.yaml", "config file (default is .cannon.yaml)")
 }
