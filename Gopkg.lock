@@ -20,6 +20,12 @@
   revision = "cd527374f1e5bff4938207604a14f2e38a9cf512"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/a8m/envsubst"
+  packages = [".","parse"]
+  revision = "4e0f64a42fec73af422e6c6f4daae9c4aaf66cb0"
+
+[[projects]]
   name = "github.com/cenk/backoff"
   packages = ["."]
   revision = "61153c768f31ee5f130071d08fc82b85208528de"
@@ -274,6 +280,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "906aead6ac1ede40216aaba2441aae3bdc56fc0e7fab3e52f540b0fa1fded438"
+  inputs-digest = "64788926aaeff5c2e76aa3e6ac8316066502378c6b0a50704c3f64b46ebd232c"
   solver-name = "gps-cdcl"
   solver-version = 1
