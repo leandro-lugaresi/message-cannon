@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -34,7 +35,7 @@ var launchCmd = &cobra.Command{
 			log, err = zap.NewDevelopment()
 		}
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error creating logger")
 		}
 		sup := supervisor.NewManager(viper.GetDuration("interval-checks"), log)
 		var factories []supervisor.Factory
@@ -43,31 +44,28 @@ var launchCmd = &cobra.Command{
 			err = viper.UnmarshalKey("rabbitmq", &config)
 			defaults.SetDefaults(&config)
 			if err != nil {
-				return errors.Wrap(err, "Problem unmarshaling your config into config struct")
+				return errors.Wrap(err, "problem unmarshaling your config into config struct")
 			}
 			var rFactory *rabbit.Factory
 			rFactory, err = rabbit.NewFactory(config, log)
 			if err != nil {
-				log.Error("Error creating the rabbitMQ factory", zap.Error(err))
-				return err
+				return errors.Wrap(err, "error creating the rabbitMQ factory")
 			}
 			factories = append(factories, rFactory)
 		}
 		err = sup.Start(factories)
 		if err != nil {
-			log.Error("Error starting the supervisor", zap.Error(err))
-			return errors.Wrap(err, "failed on supervisor start")
+			return errors.Wrap(err, "error starting the supervisor")
 		}
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
 		// Block until a signal is received.
 		s := <-sigs
-		log.Info("Signal received. shutting down...", zap.String("signal", s.String()))
+		log.Info("signal received. shutting down...", zap.String("signal", s.String()))
 		err = sup.Stop()
 		if err != nil {
-			log.Error("Error stoping the supervisor", zap.Error(err))
-			return err
+			return errors.Wrap(err, "error stopping the supervisor")
 		}
 		return nil
 	},
@@ -91,9 +89,9 @@ func init() {
 func initConfig() error {
 	b, err := envsubst.ReadFileRestricted(cfgFile, true, false)
 	if err != nil {
-		return errors.Wrap(err, "Failed to read the file")
+		return errors.Wrap(err, "failed to read the file")
 	}
-	viper.SetConfigType(filepath.Ext(cfgFile))
+	viper.SetConfigType(strings.TrimPrefix(filepath.Ext(cfgFile), "."))
 	err = viper.ReadConfig(bytes.NewBuffer(b))
-	return errors.Wrap(err, "Failed to unmarshal the initial map of configs")
+	return errors.Wrap(err, "failed to unmarshal the initial map of configs")
 }
