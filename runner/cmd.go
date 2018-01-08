@@ -8,14 +8,14 @@ import (
 
 	"os/exec"
 
+	"github.com/leandro-lugaresi/message-cannon/event"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 )
 
 type command struct {
 	cmd          string
 	args         []string
-	l            *zap.Logger
+	l            *event.Logger
 	ignoreOutput bool
 }
 
@@ -23,21 +23,21 @@ func (c *command) Process(ctx context.Context, b []byte) int {
 	cmd := exec.CommandContext(ctx, c.cmd, c.args...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		c.l.Error("Receive an error creating the stdin pipe", zap.Error(err))
+		c.l.Error("Receive an error creating the stdin pipe", event.Field{"error", err})
 	}
 	go func() {
 		_, pipeErr := stdin.Write(b)
 		if pipeErr != nil {
-			c.l.Error("Failed writing to stdin", zap.Error(pipeErr))
+			c.l.Error("Failed writing to stdin", event.Field{"error", pipeErr})
 		}
 		pipeErr = stdin.Close()
 		if pipeErr != nil {
-			c.l.Error("Failed closing stdin", zap.Error(pipeErr))
+			c.l.Error("Failed closing stdin", event.Field{"error", pipeErr})
 		}
 	}()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		c.l.Error("Receive an error from command", zap.Error(err), zap.ByteString("output", output))
+		c.l.Error("Receive an error from command", event.Field{"error", err}, event.Field{"output", output})
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
 				return status.ExitStatus()
@@ -47,12 +47,12 @@ func (c *command) Process(ctx context.Context, b []byte) int {
 		return ExitFailed
 	}
 	if !c.ignoreOutput && len(output) > 0 {
-		c.l.Info("message processed with output", zap.ByteString("output", output))
+		c.l.Info("message processed with output", event.Field{"output", output})
 	}
 	return ExitACK
 }
 
-func newCommand(log *zap.Logger, c Config) (*command, error) {
+func newCommand(log *event.Logger, c Config) (*command, error) {
 	if split := strings.Split(c.Options.Path, " "); len(split) > 1 {
 		c.Options.Path = split[0]
 		c.Options.Args = append(split[1:], c.Options.Args...)

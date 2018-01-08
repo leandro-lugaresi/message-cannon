@@ -1,4 +1,4 @@
-package events
+package event
 
 import (
 	"context"
@@ -12,8 +12,8 @@ type Level uint8
 
 // Field represent one key-value field passed with the log message.
 type Field struct {
-	key   string
-	value interface{}
+	Key   string
+	Value interface{}
 }
 
 // Message represet one log message.
@@ -81,11 +81,11 @@ func (c *core) handle() {
 }
 
 // NewLogger returns a new Logger to be used to log messages.
-func NewLogger(handler Handler, cap int) *Logger {
+func NewLogger(cap int, options ...func(*Logger)) *Logger {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	l := &Logger{
 		core: &core{
-			handler: handler,
+			handler: NewNoOpHandler(),
 			diode: newManyToOneMessage(
 				ctx,
 				cap,
@@ -95,6 +95,9 @@ func NewLogger(handler Handler, cap int) *Logger {
 			cancel: cancelFunc,
 			done:   make(chan struct{}, 1),
 		},
+	}
+	for _, option := range options {
+		option(l)
 	}
 	go l.core.handle()
 	return l
@@ -124,6 +127,27 @@ func (l *Logger) Close() {
 	<-l.core.done
 }
 
+// Debug will send an Debug event.
+func (l *Logger) Debug(msg string, fields ...Field) {
+	l.Log(DebugLevel, msg, fields...)
+}
+
+// Info will send an Info event.
+func (l *Logger) Info(msg string, fields ...Field) {
+	l.Log(InfoLevel, msg, fields...)
+}
+
+// Warn will send an Warning event.
+func (l *Logger) Warn(msg string, fields ...Field) {
+	l.Log(WarnLevel, msg, fields...)
+}
+
+// Error will send an Error event.
+func (l *Logger) Error(msg string, fields ...Field) {
+	l.Log(ErrorLevel, msg, fields...)
+}
+
+// NewNoOpHandler return an handler with always succeed without doing anything.
 func NewNoOpHandler() Handler {
 	return HandlerFunc(func(msg Message) {})
 }

@@ -9,13 +9,13 @@ import (
 	"net/http"
 	"time"
 
-	"go.uber.org/zap"
+	"github.com/leandro-lugaresi/message-cannon/event"
 )
 
 type httpRunner struct {
 	client       *http.Client
 	ignoreOutput bool
-	l            *zap.Logger
+	l            *event.Logger
 	url          string
 	headers      map[string]string
 	returnOn5xx  int
@@ -25,7 +25,7 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 	contentReader := bytes.NewReader(b)
 	req, err := http.NewRequest("POST", p.url, contentReader)
 	if err != nil {
-		p.l.Error("Error creating one request", zap.Error(err))
+		p.l.Error("Error creating the request", event.Field{"error", err})
 		return ExitRetry
 	}
 	for k, v := range p.headers {
@@ -33,29 +33,29 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 	}
 	resp, err := p.client.Do(req)
 	if err != nil {
-		p.l.Error("Failed when on request", zap.Error(err))
+		p.l.Error("Failed when doing the request", event.Field{"error", err})
 		return ExitRetry
 	}
 	defer func() {
 		deferErr := resp.Body.Close()
 		if deferErr != nil {
-			p.l.Error("Error closing the response body", zap.Error(deferErr))
+			p.l.Error("Error closing the response body", event.Field{"error", deferErr})
 		}
 	}()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		p.l.Error("Error reading the request response body", zap.Error(err))
+		p.l.Error("Error reading the request response body", event.Field{"error", err})
 	}
 	if resp.StatusCode >= 500 {
 		p.l.Error("Receive an 5xx error from request",
-			zap.Int("status-code", resp.StatusCode),
-			zap.ByteString("output", body))
+			event.Field{"status-code", resp.StatusCode},
+			event.Field{"output", body})
 		return p.returnOn5xx
 	}
 	if resp.StatusCode >= 400 {
 		p.l.Error("Receive an 4xx error from request",
-			zap.Int("status-code", resp.StatusCode),
-			zap.ByteString("output", body))
+			event.Field{"status-code", resp.StatusCode},
+			event.Field{"output", body})
 		return ExitRetry
 	}
 	if p.ignoreOutput {
@@ -66,17 +66,17 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 	}{}
 	err = json.Unmarshal(body, &content)
 	if err != nil {
-		p.l.Warn("Failed to unmarshal the response", zap.Error(err))
+		p.l.Warn("Failed to unmarshal the response", event.Field{"error", err})
 	}
 	if len(body) > 0 {
 		p.l.Info("message processed with output",
-			zap.Int("status-code", resp.StatusCode),
-			zap.ByteString("output", body))
+			event.Field{"status-code", resp.StatusCode},
+			event.Field{"output", body})
 	}
 	return content.ResponseCode
 }
 
-func newHTTP(log *zap.Logger, c Config) (*httpRunner, error) {
+func newHTTP(log *event.Logger, c Config) (*httpRunner, error) {
 	runner := httpRunner{
 		l:            log,
 		url:          c.Options.URL,

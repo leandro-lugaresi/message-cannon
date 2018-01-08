@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leandro-lugaresi/message-cannon/event"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 type message struct {
@@ -86,10 +86,8 @@ func Test_httpRunner_Process(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			originalStdout := os.Stdout
 			r, w, _ := os.Pipe()
-			os.Stdout = w
-			logger := zap.NewExample()
+			logger := event.NewLogger(30, event.WithZeroLogHandler(w, false))
 			ctx := context.Background()
 			runner, err := New(logger, Config{
 				IgnoreOutput: false,
@@ -103,6 +101,7 @@ func Test_httpRunner_Process(t *testing.T) {
 
 			got := runner.Process(ctx, tt.msg)
 
+			logger.Close()
 			err = w.Close()
 			if err != nil {
 				t.Fatal(err, "failed to close the pipe writer")
@@ -111,7 +110,6 @@ func Test_httpRunner_Process(t *testing.T) {
 			for _, entry := range tt.logEntries {
 				require.Contains(t, string(out), entry, "")
 			}
-			os.Stdout = originalStdout
 			require.Equal(t, tt.want, got, "result httpRunner.Process() differs")
 		})
 	}

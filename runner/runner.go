@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leandro-lugaresi/message-cannon/event"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"gopkg.in/mcuadros/go-defaults.v1"
 )
 
@@ -47,7 +47,7 @@ type Config struct {
 }
 
 // New create and return a Runnable based on the config type. if the type didn't exist an error is returned.
-func New(log *zap.Logger, c Config) (Runnable, error) {
+func New(log *event.Logger, c Config) (Runnable, error) {
 	defaults.SetDefaults(&c)
 	defaults.SetDefaults(&c.Options)
 	switch c.Type {
