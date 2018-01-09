@@ -61,33 +61,39 @@ func Test_httpRunner_Process(t *testing.T) {
 		{
 			"Success response with output", ExitACK,
 			[]byte(`{"code":200, "contentType": "text/html", "message": "some random content here"}`),
-			[]string{`{"level":"info","msg":"message processed with output","status-code":200,"output":"\"some random content here\""}`},
+			[]string{
+				`"level":"warn","app":"message-cannon","error":"json: cannot unmarshal string into Go value of type struct { ResponseCode int \"json:\\\"response-code\\\"\" }","status-code":200,"output":"\"some random content here\"","message":"Failed to unmarshal the response"}`,
+			},
 		},
 		{
 			"200 with return-code", ExitNACK,
 			[]byte(`{"code":200, "contentType": "application/json", "message": {"response-code":3}}`),
-			[]string{`{"level":"info","msg":"message processed with output","status-code":200,"output":"{\"response-code\":3}"}`},
+			[]string{},
 		},
 		{
 			"404 not found should retry", ExitRetry,
 			[]byte(`{"code":404, "contentType": "text/html", "message": "some random content here"}`),
-			[]string{`{"level":"error","msg":"Receive an 4xx error from request","status-code":404,"output":"\"some random content here\""}`},
+			[]string{`"level":"error","app":"message-cannon","status-code":404,"output":"\"some random content here\"","message":"Receive an 4xx error from request"}`},
 		},
 		{
 			"request with error", ExitNACKRequeue,
 			[]byte(`{"code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
-			[]string{`{"level":"error","msg":"Receive an 5xx error from request","status-code":500,"output":"{\"error\": \"PHP Exception :p\"}"}`},
+			[]string{`"level":"error","app":"message-cannon","status-code":500,"output":"{\"error\": \"PHP Exception :p\"}","message":"Receive an 5xx error from request"}`},
 		},
 		{
 			"request with timeout", ExitRetry,
 			[]byte(`{"sleep": 4000000000, "code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
-			[]string{`{"level":"error","msg":"Failed when on request","error":"Post http://localhost:8089: net/http: request canceled (Client.Timeout exceeded while awaiting headers)"}`},
+			[]string{
+				`"level":"error"`,
+				`"message":"Failed when doing the request"`,
+				`"error":"Post http://localhost:8089: net/http: request canceled (Client.Timeout exceeded while awaiting headers)"`,
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r, w, _ := os.Pipe()
-			logger := event.NewLogger(30, event.WithZeroLogHandler(w, false))
+			logger := event.NewLogger(event.NewZeroLogHandler(w, false), 30)
 			ctx := context.Background()
 			runner, err := New(logger, Config{
 				IgnoreOutput: false,

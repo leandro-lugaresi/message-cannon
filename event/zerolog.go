@@ -47,17 +47,15 @@ func (h *ZeroLogHandler) Handle(msg Message) {
 
 func (h *ZeroLogHandler) Sync() {}
 
-// WithZeroLogHandler set the ZeroLog logger with sensible defaults as the default handler.
-func WithZeroLogHandler(w io.Writer, development bool) func(*Logger) {
-	return func(l *Logger) {
-		if development {
-			w = zerolog.ConsoleWriter{Out: w}
-		}
-		l.core.handler = &ZeroLogHandler{
-			log: zerolog.New(w).With().
-				Timestamp().
-				Str("app", "message-cannon").
-				Logger(),
-		}
+// NewZeroLogHandler set the ZeroLog logger with sensible defaults as the default handler.
+func NewZeroLogHandler(w io.Writer, development bool) Handler {
+	if development {
+		w = zerolog.ConsoleWriter{Out: w}
+	}
+	return &ZeroLogHandler{
+		log: zerolog.New(w).With().
+			Timestamp().
+			Str("app", "message-cannon").
+			Logger(),
 	}
 }

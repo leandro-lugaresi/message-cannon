@@ -81,11 +81,11 @@ func (c *core) handle() {
 }
 
 // NewLogger returns a new Logger to be used to log messages.
-func NewLogger(cap int, options ...func(*Logger)) *Logger {
+func NewLogger(handler Handler, cap int) *Logger {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	l := &Logger{
 		core: &core{
-			handler: NewNoOpHandler(),
+			handler: handler,
 			diode: newManyToOneMessage(
 				ctx,
 				cap,
@@ -95,9 +95,6 @@ func NewLogger(cap int, options ...func(*Logger)) *Logger {
 			cancel: cancelFunc,
 			done:   make(chan struct{}, 1),
 		},
-	}
-	for _, option := range options {
-		option(l)
 	}
 	go l.core.handle()
 	return l

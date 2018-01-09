@@ -8,7 +8,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	logger := event.NewLogger(300)
+	logger := event.NewLogger(event.NewNoOpHandler(), 30)
 	tests := []struct {
 		name       string
 		c          Config
@@ -70,7 +70,7 @@ func TestNew(t *testing.T) {
 
 func TestRunShoudSetDefaults(t *testing.T) {
 	t.Run("with empty values", func(t *testing.T) {
-		got, err := New(event.NewLogger(300), Config{
+		got, err := New(event.NewLogger(event.NewNoOpHandler(), 30), Config{
 			Type: "http",
 		})
 		assert.NoError(t, err)
@@ -79,7 +79,7 @@ func TestRunShoudSetDefaults(t *testing.T) {
 		assert.Equal(t, 4, httpRunner.returnOn5xx)
 	})
 	t.Run("using ack integer should overide to default", func(t *testing.T) {
-		got, err := New(event.NewLogger(300), Config{
+		got, err := New(event.NewLogger(event.NewNoOpHandler(), 30), Config{
 			Type: "http",
 			Options: Options{
 				ReturnOn5xx: ExitACK,

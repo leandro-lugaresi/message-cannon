@@ -65,11 +65,9 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 		ResponseCode int `json:"response-code"`
 	}{}
 	err = json.Unmarshal(body, &content)
-	if err != nil {
-		p.l.Warn("Failed to unmarshal the response", event.Field{"error", err})
-	}
-	if len(body) > 0 {
-		p.l.Info("message processed with output",
+	if err != nil && len(body) > 0 {
+		p.l.Warn("Failed to unmarshal the response",
+			event.Field{"error", err},
 			event.Field{"status-code", resp.StatusCode},
 			event.Field{"output", body})
 	}

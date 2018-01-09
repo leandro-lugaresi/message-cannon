@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -79,12 +78,7 @@ func BenchmarkLogFirstLevel(b *testing.B) {
 }
 
 func BenchmarkLogZeroLog(b *testing.B) {
-	log := NewLogger(&ZeroLogHandler{
-		log: zerolog.New(ioutil.Discard).With().
-			Timestamp().
-			Str("app", "message-cannon").
-			Logger(),
-	}, b.N)
+	log := NewLogger(NewZeroLogHandler(ioutil.Discard, false), b.N)
 	for n := 0; n < b.N; n++ {
 		log.Log(InfoLevel, "message log for benchmark", Field{"n", n}, Field{"bench1", true})
 	}

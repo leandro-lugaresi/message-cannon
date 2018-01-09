@@ -34,14 +34,15 @@ func Test_command_Process(t *testing.T) {
 			"Command with exit 1",
 			args{[]byte(`{"exitcode": 1, "delay": 100000, "error": "Something is wrong :o"}`), false},
 			1,
-			[]string{`"level":"error","msg":"Receive an error from command","error":"exit status 1","output":"Something is wrong :o"`},
+			[]string{`"level":"error","app":"message-cannon","error":"exit status 1","output":"Something is wrong :o","message":"Receive an error from command"}`},
 		},
 		{
 			"Command with php exception",
 			args{[]byte(`{"delay": 2000000, "exception": "Something is wrong :o"}`), false},
 			255,
 			[]string{
-				`"level":"error","msg":"Receive an error from command","error":"exit status 255","output":"PHP Fatal error:`,
+				`"level":"error","app":"message-cannon","error":"exit status 255","output":"PHP Fatal error:`,
+				`"message":"Receive an error from command"`,
 			},
 		},
 		{
@@ -49,7 +50,7 @@ func Test_command_Process(t *testing.T) {
 			args{[]byte(`{"exitcode": 0,"delay": 2000000}`), true},
 			-1,
 			[]string{
-				`"level":"error","msg":"Receive an error from command","error":"signal: killed"`,
+				`"level":"error","app":"message-cannon","error":"signal: killed","output":"","message":"Receive an error from command"`,
 			},
 		},
 	}
@@ -57,7 +58,7 @@ func Test_command_Process(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r, w, err := os.Pipe()
 			require.NoError(t, err, "Fail creating the pipe file")
-			logger := event.NewLogger(300, event.WithZeroLogHandler(w, false))
+			logger := event.NewLogger(event.NewZeroLogHandler(w, false), 30)
 			c := &command{
 				cmd:  "testdata/receive.php",
 				args: []string{},
