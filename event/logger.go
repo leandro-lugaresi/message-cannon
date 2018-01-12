@@ -16,7 +16,7 @@ type Field struct {
 	Value interface{}
 }
 
-// Message represet one log message.
+// Message represent one log message.
 type Message struct {
 	Level  Level
 	Msg    string

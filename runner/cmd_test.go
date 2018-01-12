@@ -34,7 +34,7 @@ func Test_command_Process(t *testing.T) {
 			"Command with exit 1",
 			args{[]byte(`{"exitcode": 1, "delay": 100000, "error": "Something is wrong :o"}`), false},
 			1,
-			[]string{`"level":"error","app":"message-cannon","error":"exit status 1","output":"Something is wrong :o","message":"Receive an error from command"}`},
+			[]string{`"level":"error","app":"message-cannon","error":"exit status 1","output":"Something is wrong :o","message":"receive an error from command"}`},
 		},
 		{
 			"Command with php exception",
@@ -42,7 +42,7 @@ func Test_command_Process(t *testing.T) {
 			255,
 			[]string{
 				`"level":"error","app":"message-cannon","error":"exit status 255","output":"PHP Fatal error:`,
-				`"message":"Receive an error from command"`,
+				`"message":"receive an error from command"`,
 			},
 		},
 		{
@@ -50,7 +50,7 @@ func Test_command_Process(t *testing.T) {
 			args{[]byte(`{"exitcode": 0,"delay": 2000000}`), true},
 			-1,
 			[]string{
-				`"level":"error","app":"message-cannon","error":"signal: killed","output":"","message":"Receive an error from command"`,
+				`"level":"error","app":"message-cannon","error":"signal: killed","output":"","message":"receive an error from command"`,
 			},
 		},
 	}
@@ -62,7 +62,7 @@ func Test_command_Process(t *testing.T) {
 			c := &command{
 				cmd:  "testdata/receive.php",
 				args: []string{},
-				l:    logger,
+				log:  logger,
 			}
 			ctx := context.Background()
 			if tt.args.timeout {

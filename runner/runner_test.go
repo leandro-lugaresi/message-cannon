@@ -35,7 +35,7 @@ func TestNew(t *testing.T) {
 			&command{
 				cmd:          "/usr/bin/tail",
 				args:         []string{"-f"},
-				l:            logger,
+				log:          logger,
 				ignoreOutput: true,
 			}, false, "",
 		},
@@ -48,7 +48,7 @@ func TestNew(t *testing.T) {
 			},
 			&command{
 				cmd: "testdata/receive.php",
-				l:   logger,
+				log: logger,
 			}, false, "",
 		},
 	}
