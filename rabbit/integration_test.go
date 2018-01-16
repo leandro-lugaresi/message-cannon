@@ -11,8 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/zap"
-
+	"github.com/leandro-lugaresi/message-cannon/event"
 	"github.com/leandro-lugaresi/message-cannon/supervisor"
 	rabbithole "github.com/michaelklishin/rabbit-hole"
 	"github.com/spf13/viper"
@@ -44,7 +43,7 @@ func TestIntegrationSuite(t *testing.T) {
 			conn := c.Connections["default"]
 			conn.DSN = "amqp://guest:guest@localhost:80/"
 			c.Connections["default"] = conn
-			_, err := NewFactory(c, zap.NewNop())
+			_, err := NewFactory(c, event.NewLogger(event.NewNoOpHandler(), 30))
 			require.NotNil(t, err)
 			assert.Contains(t, err.Error(), "error opening the connection \"default\": ")
 		})
@@ -52,7 +51,7 @@ func TestIntegrationSuite(t *testing.T) {
 			conn := c.Connections["default"]
 			conn.DSN = "amqp://guest:guest@10.255.255.1:5672/"
 			c.Connections["default"] = conn
-			_, err := NewFactory(c, zap.NewNop())
+			_, err := NewFactory(c, event.NewLogger(event.NewNoOpHandler(), 30))
 			assert.EqualError(t, err, "error opening the connection \"default\": dial tcp 10.255.255.1:5672: i/o timeout")
 		})
 	})
@@ -64,7 +63,7 @@ func TestIntegrationSuite(t *testing.T) {
 		conn = c.Connections["test1"]
 		conn.DSN = fmt.Sprintf("amqp://localhost:%s", resource.GetPort("5672/tcp"))
 		c.Connections["test1"] = conn
-		factory, err := NewFactory(c, zap.NewNop())
+		factory, err := NewFactory(c, event.NewLogger(event.NewNoOpHandler(), 30))
 		require.NoError(t, err, "Failed to create the rabbitMQ factory")
 		require.Len(t, factory.conns, 2)
 		var consumers []supervisor.Consumer
@@ -92,7 +91,7 @@ func TestIntegrationSuite(t *testing.T) {
 		}
 	})
 	t.Run("TestConsumerProcess", func(t *testing.T) {
-		factory, err := NewFactory(config, zap.NewNop())
+		factory, err := NewFactory(config, event.NewLogger(event.NewNoOpHandler(), 30))
 		require.NoError(t, err, "Failed to create the factory")
 		cons, err := factory.CreateConsumer("test1")
 		require.NoError(t, err, "Failed to create all the consumers")
@@ -120,12 +119,9 @@ func TestIntegrationSuite(t *testing.T) {
 		}
 	})
 	t.Run("TestConsumerReconnect", func(t *testing.T) {
-		stdStderr := os.Stderr
 		r, w, err := os.Pipe()
 		require.NoError(t, err, "Failed to open an file pipe")
-		os.Stderr = w
-		log, err := zap.NewDevelopment()
-		require.NoError(t, err, "Failed to create the log")
+		log := event.NewLogger(event.NewZeroLogHandler(w, false), 30)
 		factory, err := NewFactory(config, log)
 		require.NoError(t, err, "Failed to create the factory")
 
@@ -159,15 +155,14 @@ func TestIntegrationSuite(t *testing.T) {
 		require.NoError(t, err, "Failed closing the pipe")
 		out, err := ioutil.ReadAll(r)
 		require.NoError(t, err, "failed to get the log output")
-		assert.Contains(t, string(out), `{"consumer": "test1", "output": "3"}`)
+		assert.Contains(t, string(out), `"output":"3","consumer":"test1",`)
 		assert.Contains(t, string(out), "Recreating the consumer")
-		assert.Contains(t, string(out), `{"consumer": "test1", "output": "6"}`)
+		assert.Contains(t, string(out), `"output":"6","consumer":"test1"`)
 
 		_, err = client.DeleteQueue("/", "upload-picture")
 		require.NoError(t, err, "failed to delete the queue")
 		err = sup.Stop()
 		require.NoError(t, err, "fail to close the supervisor and consumers")
-		os.Stderr = stdStderr
 	})
 }
 

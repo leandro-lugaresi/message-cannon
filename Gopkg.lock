@@ -3,6 +3,12 @@
 
 [[projects]]
   branch = "master"
+  name = "code.cloudfoundry.org/go-diodes"
+  packages = ["."]
+  revision = "c71ea5e735942fdbb46405ec708cb3816d1c6dbf"
+
+[[projects]]
+  branch = "master"
   name = "github.com/Azure/go-ansiterm"
   packages = [".","winterm"]
   revision = "d6e3b3328b783f23731bc4d058875b0371ff8109"
@@ -146,6 +152,12 @@
   revision = "3bbade4f4fab0cf8e41928da5869760c17a037db"
 
 [[projects]]
+  name = "github.com/rs/zerolog"
+  packages = [".","internal/json"]
+  revision = "b53826c57a6a1d8833443ebeacf1cfb62b229c64"
+  version = "v1.4.0"
+
+[[projects]]
   name = "github.com/sirupsen/logrus"
   packages = ["."]
   revision = "f006c2ac4710855cf0f916dd6b77acf6b048dc6e"
@@ -206,24 +218,6 @@
   version = "v1.1.4"
 
 [[projects]]
-  name = "go.uber.org/atomic"
-  packages = ["."]
-  revision = "4e336646b2ef9fc6e47be8e21594178f98e5ebcf"
-  version = "v1.2.0"
-
-[[projects]]
-  name = "go.uber.org/multierr"
-  packages = ["."]
-  revision = "3c4937480c32f4c13a875a1829af76c98ca3d40a"
-  version = "v1.1.0"
-
-[[projects]]
-  name = "go.uber.org/zap"
-  packages = [".","buffer","internal/bufferpool","internal/color","internal/exit","zapcore"]
-  revision = "35aad584952c3e7020db7b839f6b102de6271f89"
-  version = "v1.7.1"
-
-[[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
@@ -274,6 +268,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "906aead6ac1ede40216aaba2441aae3bdc56fc0e7fab3e52f540b0fa1fded438"
+  inputs-digest = "765b7654f94b95a1aa24e48b5498af1e155125174f283b36fa9375a4df1097c0"
   solver-name = "gps-cdcl"
   solver-version = 1

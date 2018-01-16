@@ -7,12 +7,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/leandro-lugaresi/message-cannon/event"
 	"github.com/leandro-lugaresi/message-cannon/rabbit"
 	"github.com/leandro-lugaresi/message-cannon/supervisor"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 	"gopkg.in/mcuadros/go-defaults.v1"
 )
 
@@ -22,34 +22,27 @@ var launchCmd = &cobra.Command{
 	Short: "Launch will start all the consumers from the config file",
 	Long:  `Launch will start all the consumers from the config file `,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		log, err := zap.NewProduction()
-		if viper.GetBool("development") {
-			log, err = zap.NewDevelopment()
-		}
-		if err != nil {
-			return err
-		}
+		log := event.NewLogger(event.NewZeroLogHandler(
+			os.Stdout,
+			viper.GetBool("development")), viper.GetInt("event-buffer"))
 		sup := supervisor.NewManager(viper.GetDuration("interval-checks"), log)
 		var factories []supervisor.Factory
 		if viper.InConfig("rabbitmq") {
 			config := rabbit.Config{}
-			err = viper.UnmarshalKey("rabbitmq", &config)
+			err := viper.UnmarshalKey("rabbitmq", &config)
 			defaults.SetDefaults(&config)
 			if err != nil {
-				log.Error("Error unmarshaling the config", zap.Error(err))
 				return errors.Wrap(err, "Problem unmarshaling your config into config struct")
 			}
 			var rFactory *rabbit.Factory
 			rFactory, err = rabbit.NewFactory(config, log)
 			if err != nil {
-				log.Error("Error creating the rabbitMQ factory", zap.Error(err))
 				return err
 			}
 			factories = append(factories, rFactory)
 		}
-		err = sup.Start(factories)
+		err := sup.Start(factories)
 		if err != nil {
-			log.Error("Error starting the supervisor", zap.Error(err))
 			return errors.Wrap(err, "failed on supervisor start")
 		}
 		sigs := make(chan os.Signal, 1)
@@ -57,24 +50,27 @@ var launchCmd = &cobra.Command{
 
 		// Block until a signal is received.
 		s := <-sigs
-		log.Info("Signal received. shutting down...", zap.String("signal", s.String()))
+		log.Info("Signal received. shutting down...", event.Field{"signal", s.String()})
 		err = sup.Stop()
-		if err != nil {
-			log.Error("Error stoping the supervisor", zap.Error(err))
-			return err
-		}
-		return nil
+		return err
 	},
 }
 
 func init() {
 	launchCmd.Flags().DurationP("interval-checks", "c", 500*time.Millisecond, "this flag set the interval duration of supervisor operations")
-	launchCmd.Flags().BoolP("development", "d", false, "this flag enable the development mode")
 	err := viper.BindPFlag("interval-checks", launchCmd.Flags().Lookup("interval-checks"))
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	launchCmd.Flags().BoolP("development", "d", false, "this flag enable the development mode")
 	err = viper.BindPFlag("development", launchCmd.Flags().Lookup("development"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	launchCmd.Flags().IntP("event-buffer", "b", 300, "this flag set the buffer size of the log and metrics systems")
+	err = viper.BindPFlag("event-buffer", launchCmd.Flags().Lookup("event-buffer"))
 	if err != nil {
 		log.Fatal(err)
 	}

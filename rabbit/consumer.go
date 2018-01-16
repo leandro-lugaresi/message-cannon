@@ -8,9 +8,9 @@ import (
 
 	"gopkg.in/tomb.v2"
 
+	"github.com/leandro-lugaresi/message-cannon/event"
 	"github.com/leandro-lugaresi/message-cannon/runner"
 	"github.com/streadway/amqp"
-	"go.uber.org/zap"
 )
 
 type consumer struct {
@@ -24,7 +24,7 @@ type consumer struct {
 	opts        Options
 	channel     *amqp.Channel
 	t           tomb.Tomb
-	l           *zap.Logger
+	l           *event.Logger
 }
 
 // Run will get the messages and pass to the runner.
@@ -33,7 +33,7 @@ func (c *consumer) Run() {
 		defer func() {
 			err := c.channel.Close()
 			if err != nil {
-				c.l.Error("Error closing the consumer channel", zap.Error(err))
+				c.l.Error("Error closing the consumer channel", event.Field{"error", err})
 			}
 		}()
 		d, err := c.channel.Consume(c.queue, "rabbitmq-"+c.name+"-"+c.hash,
@@ -43,7 +43,7 @@ func (c *consumer) Run() {
 			c.opts.NoWait,
 			c.opts.Args)
 		if err != nil {
-			c.l.Error("Failed to start consume", zap.Error(err))
+			c.l.Error("Failed to start consume", event.Field{"error", err})
 			return err
 		}
 		dying := c.t.Dying()
@@ -116,10 +116,10 @@ func (c *consumer) processMessage(ctx context.Context, msg amqp.Delivery) {
 	case runner.ExitNACK:
 		err = msg.Nack(false, false)
 	default:
-		c.l.Warn("The runner return an unexpected exitStatus and the message will be requeued.", zap.Int("status", status))
+		c.l.Warn("The runner return an unexpected exitStatus and the message will be requeued.", event.Field{"status", status})
 		err = msg.Reject(true)
 	}
 	if err != nil {
-		c.l.Error("Error during the acknowledgement phase", zap.Error(err))
+		c.l.Error("Error during the acknowledgement phase", event.Field{"error", err})
 	}
 }
