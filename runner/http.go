@@ -15,7 +15,7 @@ import (
 type httpRunner struct {
 	client       *http.Client
 	ignoreOutput bool
-	l            *event.Logger
+	log          *event.Logger
 	url          string
 	headers      map[string]string
 	returnOn5xx  int
@@ -25,7 +25,7 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 	contentReader := bytes.NewReader(b)
 	req, err := http.NewRequest("POST", p.url, contentReader)
 	if err != nil {
-		p.l.Error("Error creating the request", event.Field{"error", err})
+		p.log.Error("error creating the request", event.Field{"error", err})
 		return ExitRetry
 	}
 	for k, v := range p.headers {
@@ -33,27 +33,27 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 	}
 	resp, err := p.client.Do(req)
 	if err != nil {
-		p.l.Error("Failed when doing the request", event.Field{"error", err})
+		p.log.Error("failed doing the request", event.Field{"error", err})
 		return ExitRetry
 	}
 	defer func() {
 		deferErr := resp.Body.Close()
 		if deferErr != nil {
-			p.l.Error("Error closing the response body", event.Field{"error", deferErr})
+			p.log.Error("error closing the response body", event.Field{"error", deferErr})
 		}
 	}()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		p.l.Error("Error reading the request response body", event.Field{"error", err})
+		p.log.Error("error reading the response body", event.Field{"error", err})
 	}
 	if resp.StatusCode >= 500 {
-		p.l.Error("Receive an 5xx error from request",
+		p.log.Error("receive an 5xx error from request",
 			event.Field{"status-code", resp.StatusCode},
 			event.Field{"output", body})
 		return p.returnOn5xx
 	}
 	if resp.StatusCode >= 400 {
-		p.l.Error("Receive an 4xx error from request",
+		p.log.Error("receive an 4xx error from request",
 			event.Field{"status-code", resp.StatusCode},
 			event.Field{"output", body})
 		return ExitRetry
@@ -66,7 +66,7 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 	}{}
 	err = json.Unmarshal(body, &content)
 	if err != nil && len(body) > 0 {
-		p.l.Warn("Failed to unmarshal the response",
+		p.log.Warn("failed to unmarshal the response",
 			event.Field{"error", err},
 			event.Field{"status-code", resp.StatusCode},
 			event.Field{"output", body})
@@ -76,7 +76,7 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 
 func newHTTP(log *event.Logger, c Config) (*httpRunner, error) {
 	runner := httpRunner{
-		l:            log,
+		log:          log,
 		url:          c.Options.URL,
 		ignoreOutput: c.IgnoreOutput,
 		headers:      c.Options.Headers,

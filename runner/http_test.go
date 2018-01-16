@@ -3,9 +3,7 @@ package runner
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -48,52 +46,38 @@ func Test_httpRunner_Process(t *testing.T) {
 	}()
 	time.Sleep(10 * time.Millisecond)
 	tests := []struct {
-		name       string
-		want       int
-		msg        []byte
-		logEntries []string
+		name string
+		want int
+		msg  []byte
 	}{
 		{
 			"Success response without output", ExitACK,
 			[]byte(`{"code":200, "contentType": "text/html", "message": ""}`),
-			[]string{},
 		},
 		{
 			"Success response with output", ExitACK,
 			[]byte(`{"code":200, "contentType": "text/html", "message": "some random content here"}`),
-			[]string{
-				`"level":"warn","app":"message-cannon","error":"json: cannot unmarshal string into Go value of type struct { ResponseCode int \"json:\\\"response-code\\\"\" }","status-code":200,"output":"\"some random content here\"","message":"Failed to unmarshal the response"}`,
-			},
 		},
 		{
 			"200 with return-code", ExitNACK,
 			[]byte(`{"code":200, "contentType": "application/json", "message": {"response-code":3}}`),
-			[]string{},
 		},
 		{
 			"404 not found should retry", ExitRetry,
 			[]byte(`{"code":404, "contentType": "text/html", "message": "some random content here"}`),
-			[]string{`"level":"error","app":"message-cannon","status-code":404,"output":"\"some random content here\"","message":"Receive an 4xx error from request"}`},
 		},
 		{
 			"request with error", ExitNACKRequeue,
 			[]byte(`{"code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
-			[]string{`"level":"error","app":"message-cannon","status-code":500,"output":"{\"error\": \"PHP Exception :p\"}","message":"Receive an 5xx error from request"}`},
 		},
 		{
-			"request with timeout", ExitRetry,
+			"request with timeout", ExitTimeout,
 			[]byte(`{"sleep": 4000000000, "code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
-			[]string{
-				`"level":"error"`,
-				`"message":"Failed when doing the request"`,
-				`"error":"Post http://localhost:8089: net/http: request canceled (Client.Timeout exceeded while awaiting headers)"`,
-			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, w, _ := os.Pipe()
-			logger := event.NewLogger(event.NewZeroLogHandler(w, false), 30)
+			logger := event.NewLogger(event.NewNoOpHandler(), 30)
 			ctx := context.Background()
 			runner, err := New(logger, Config{
 				IgnoreOutput: false,
@@ -108,14 +92,6 @@ func Test_httpRunner_Process(t *testing.T) {
 			got := runner.Process(ctx, tt.msg)
 
 			logger.Close()
-			err = w.Close()
-			if err != nil {
-				t.Fatal(err, "failed to close the pipe writer")
-			}
-			out, _ := ioutil.ReadAll(r)
-			for _, entry := range tt.logEntries {
-				require.Contains(t, string(out), entry, "")
-			}
 			require.Equal(t, tt.want, got, "result httpRunner.Process() differs")
 		})
 	}
