@@ -92,21 +92,21 @@ func (m *Manager) checkConsumers() {
 		m.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
 			for name, c := range consumers {
 				if !c.Alive() {
-					m.logger.Info("Recreating the consumer ", event.Field{"consumer-name", name})
+					m.logger.Info("Recreating the consumer ", event.KV("consumer-name", name))
 					delete(consumers, name)
 					f, ok := factories[c.FactoryName()]
 					if !ok {
 						m.logger.Warn("Factory did not exist anymore",
-							event.Field{"factory-name", c.FactoryName()},
-							event.Field{"consumer-name", name})
+							event.KV("factory-name", c.FactoryName()),
+							event.KV("consumer-name", name))
 						continue
 					}
 					nc, err := f.CreateConsumer(name)
 					if err != nil {
 						m.logger.Error("Error recreating one consumer",
-							event.Field{"error", err},
-							event.Field{"factory-name", c.FactoryName()},
-							event.Field{"consumer-name", c.Name()})
+							event.KV("error", err),
+							event.KV("factory-name", c.FactoryName()),
+							event.KV("consumer-name", c.Name()))
 						continue
 					}
 					consumers[name] = nc

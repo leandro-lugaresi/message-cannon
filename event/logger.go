@@ -109,6 +109,7 @@ func (l *Logger) Log(level Level, msg string, fields ...Field) {
 		Fields: fields,
 	}
 	l.core.diode.Set(m)
+
 }
 
 // With return a new sub Logger with fields attached.
@@ -147,4 +148,9 @@ func (l *Logger) Error(msg string, fields ...Field) {
 // NewNoOpHandler return an handler with always succeed without doing anything.
 func NewNoOpHandler() Handler {
 	return HandlerFunc(func(msg Message) {})
+}
+
+// KV return an Field with the key and value passed.
+func KV(k string, v interface{}) Field {
+	return Field{Key: k, Value: v}
 }

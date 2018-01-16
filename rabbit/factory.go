@@ -115,8 +115,8 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 		return nil, err
 	}
 	f.log.Debug("setting QoS",
-		event.Field{"count", cfg.PrefetchCount},
-		event.Field{"consumer", name})
+		event.KV("count", cfg.PrefetchCount),
+		event.KV("consumer", name))
 	if err = ch.Qos(cfg.PrefetchCount, 0, false); err != nil {
 		return nil, errors.Wrap(err, "failed to set QoS")
 	}
@@ -124,13 +124,13 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	atomic.AddInt64(&f.number, 1)
 	hashcounter, err := hash.EncodeInt64([]int64{f.number})
 	if err != nil {
-		f.log.Warn("Problem generating the hash", event.Field{"error", err})
+		f.log.Warn("Problem generating the hash", event.KV("error", err))
 	}
-	runner, err := runner.New(f.log.With(event.Field{"consumer", name}), cfg.Runner)
+	runner, err := runner.New(f.log.With(event.KV("consumer", name)), cfg.Runner)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create the runner")
 	}
-	f.log.Info("qtd of workers", event.Field{"workers", cfg.Workers}, event.Field{"name", name})
+	f.log.Info("qtd of workers", event.KV("workers", cfg.Workers), event.KV("name", name))
 	return &consumer{
 		queue:       cfg.Queue.Name,
 		name:        name,
@@ -140,7 +140,7 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 		channel:     ch,
 		t:           tomb.Tomb{},
 		runner:      runner,
-		l:           f.log.With(event.Field{"consumer", name}),
+		l:           f.log.With(event.KV("consumer", name)),
 		throttle:    make(chan struct{}, cfg.Workers),
 		timeout:     cfg.Runner.Timeout,
 	}, nil
@@ -154,13 +154,13 @@ func (f *Factory) declareExchange(ch *amqp.Channel, name string) error {
 	ex, ok := f.config.Exchanges[name]
 	if !ok {
 		f.log.Warn("exchange config didn't exist, we will try to continue",
-			event.Field{"name", name})
+			event.KV("name", name))
 		return nil
 	}
 	f.log.Debug("declaring exchange",
-		event.Field{"ex", name},
-		event.Field{"type", ex.Type},
-		event.Field{"options", ex.Options})
+		event.KV("ex", name),
+		event.KV("type", ex.Type),
+		event.KV("options", ex.Options))
 	err := ch.ExchangeDeclare(
 		name,
 		ex.Type,
@@ -177,8 +177,8 @@ func (f *Factory) declareExchange(ch *amqp.Channel, name string) error {
 
 func (f *Factory) declareQueue(ch *amqp.Channel, queue QueueConfig) error {
 	f.log.Debug("declaring queue",
-		event.Field{"queue", queue.Name},
-		event.Field{"options", queue.Options})
+		event.KV("queue", queue.Name),
+		event.KV("options", queue.Options))
 	q, err := ch.QueueDeclare(
 		queue.Name,
 		queue.Options.Durable,
@@ -192,8 +192,8 @@ func (f *Factory) declareQueue(ch *amqp.Channel, queue QueueConfig) error {
 
 	for _, b := range queue.Bindings {
 		f.log.Debug("adding queue bind",
-			event.Field{"queue", q.Name},
-			event.Field{"exchange", b.Exchange})
+			event.KV("queue", q.Name),
+			event.KV("exchange", b.Exchange))
 		err = f.declareExchange(ch, b.Exchange)
 		if err != nil {
 			return err
@@ -210,11 +210,11 @@ func (f *Factory) declareQueue(ch *amqp.Channel, queue QueueConfig) error {
 }
 
 func (f *Factory) declareDeadLetters(ch *amqp.Channel, name string) error {
-	f.log.Debug("declaring deadletter", event.Field{"dlx", name})
+	f.log.Debug("declaring deadletter", event.KV("dlx", name))
 	dead, ok := f.config.DeadLetters[name]
 	if !ok {
 		f.log.Warn("deadletter config didn't exist, we will try to continue",
-			event.Field{"dlx", name})
+			event.KV("dlx", name))
 		return nil
 	}
 	err := f.declareQueue(ch, dead.Queue)

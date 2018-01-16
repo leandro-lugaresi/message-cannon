@@ -13,7 +13,7 @@ func TestLogger_LogShouldSendAllLogsToHandler(t *testing.T) {
 		messsages = append(messsages, msg)
 	}), 10)
 	for i := 0; i < 10; i++ {
-		log.Log(WarnLevel, "test message", Field{"i", i}, Field{"priest", "wololo"})
+		log.Log(WarnLevel, "test message", KV("i", i), KV("priest", "wololo"))
 	}
 	log.Close()
 	for i, msg := range messsages {
@@ -21,50 +21,50 @@ func TestLogger_LogShouldSendAllLogsToHandler(t *testing.T) {
 			Msg:   "test message",
 			Level: WarnLevel,
 			Fields: []Field{
-				Field{"i", i},
-				Field{"priest", "wololo"},
+				KV("i", i),
+				KV("priest", "wololo"),
 			},
 		}, msg, "Wrong message received")
 	}
 }
 
-func TestLogger_WithShouldCreateAnSubLoggerWithAllTheFields(t *testing.T) {
+func TestLogger_WithLevelsShouldCreateAnSubLoggerWithAllTheFields(t *testing.T) {
 	messsages := []Message{}
 	log := NewLogger(HandlerFunc(func(msg Message) {
 		messsages = append(messsages, msg)
 	}), 10)
-	sub1 := log.With(Field{"foo", "baz"}, Field{"proc", "sub1"})
-	sub2 := log.With(Field{"foo", "baz"}, Field{"proc", "sub2"})
+	sub1 := log.With(KV("foo", "baz"), KV("proc", "sub1"))
+	sub2 := log.With(KV("foo", "baz"), KV("proc", "sub2"))
 	sub1.Log(InfoLevel, "test log sub1")
 	sub2.Log(InfoLevel, "test log sub2")
-	sub21 := sub2.With(Field{"inner-log", true})
-	sub21.Log(InfoLevel, "test log sub21", Field{"id", 123})
+	sub21 := sub2.With(KV("inner-log", true))
+	sub21.Log(InfoLevel, "test log sub21", KV("id", 123))
 	log.Close()
 	require.Equal(t, 3, len(messsages))
 	require.Equal(t, Message{
 		Msg:   "test log sub1",
 		Level: InfoLevel,
 		Fields: []Field{
-			Field{"foo", "baz"},
-			Field{"proc", "sub1"},
+			KV("foo", "baz"),
+			KV("proc", "sub1"),
 		},
 	}, messsages[0], "Receive invalid message for sub1")
 	require.Equal(t, Message{
 		Msg:   "test log sub2",
 		Level: InfoLevel,
 		Fields: []Field{
-			Field{"foo", "baz"},
-			Field{"proc", "sub2"},
+			KV("foo", "baz"),
+			KV("proc", "sub2"),
 		},
 	}, messsages[1], "Receive invalid message for sub2")
 	require.Equal(t, Message{
 		Msg:   "test log sub21",
 		Level: InfoLevel,
 		Fields: []Field{
-			Field{"id", 123},
-			Field{"foo", "baz"},
-			Field{"proc", "sub2"},
-			Field{"inner-log", true},
+			KV("id", 123),
+			KV("foo", "baz"),
+			KV("proc", "sub2"),
+			KV("inner-log", true),
 		},
 	}, messsages[2], "Receive invalid message for sub21")
 }
@@ -72,7 +72,7 @@ func TestLogger_WithShouldCreateAnSubLoggerWithAllTheFields(t *testing.T) {
 func BenchmarkLogFirstLevel(b *testing.B) {
 	log := NewLogger(NewNoOpHandler(), b.N)
 	for n := 0; n < b.N; n++ {
-		log.Log(InfoLevel, "message log for benchmark", Field{"n", n}, Field{"bench1", true})
+		log.Log(InfoLevel, "message log for benchmark", KV("n", n), KV("bench1", true))
 	}
 	log.Close()
 }
@@ -80,7 +80,7 @@ func BenchmarkLogFirstLevel(b *testing.B) {
 func BenchmarkLogZeroLog(b *testing.B) {
 	log := NewLogger(NewZeroLogHandler(ioutil.Discard, false), b.N)
 	for n := 0; n < b.N; n++ {
-		log.Log(InfoLevel, "message log for benchmark", Field{"n", n}, Field{"bench1", true})
+		log.Log(InfoLevel, "message log for benchmark", KV("n", n), KV("bench1", true))
 	}
 	log.Close()
 }

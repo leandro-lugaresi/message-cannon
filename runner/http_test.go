@@ -71,7 +71,7 @@ func Test_httpRunner_Process(t *testing.T) {
 			[]byte(`{"code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
 		},
 		{
-			"request with timeout", ExitTimeout,
+			"request with timeout", ExitRetry,
 			[]byte(`{"sleep": 4000000000, "code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
 		},
 	}

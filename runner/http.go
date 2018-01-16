@@ -25,7 +25,7 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 	contentReader := bytes.NewReader(b)
 	req, err := http.NewRequest("POST", p.url, contentReader)
 	if err != nil {
-		p.log.Error("error creating the request", event.Field{"error", err})
+		p.log.Error("error creating the request", event.KV("error", err))
 		return ExitRetry
 	}
 	for k, v := range p.headers {
@@ -33,29 +33,29 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 	}
 	resp, err := p.client.Do(req)
 	if err != nil {
-		p.log.Error("failed doing the request", event.Field{"error", err})
+		p.log.Error("failed doing the request", event.KV("error", err))
 		return ExitRetry
 	}
 	defer func() {
 		deferErr := resp.Body.Close()
 		if deferErr != nil {
-			p.log.Error("error closing the response body", event.Field{"error", deferErr})
+			p.log.Error("error closing the response body", event.KV("error", deferErr))
 		}
 	}()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		p.log.Error("error reading the response body", event.Field{"error", err})
+		p.log.Error("error reading the response body", event.KV("error", err))
 	}
 	if resp.StatusCode >= 500 {
 		p.log.Error("receive an 5xx error from request",
-			event.Field{"status-code", resp.StatusCode},
-			event.Field{"output", body})
+			event.KV("status-code", resp.StatusCode),
+			event.KV("output", body))
 		return p.returnOn5xx
 	}
 	if resp.StatusCode >= 400 {
 		p.log.Error("receive an 4xx error from request",
-			event.Field{"status-code", resp.StatusCode},
-			event.Field{"output", body})
+			event.KV("status-code", resp.StatusCode),
+			event.KV("output", body))
 		return ExitRetry
 	}
 	if p.ignoreOutput {
@@ -67,9 +67,9 @@ func (p *httpRunner) Process(ctx context.Context, b []byte) int {
 	err = json.Unmarshal(body, &content)
 	if err != nil && len(body) > 0 {
 		p.log.Warn("failed to unmarshal the response",
-			event.Field{"error", err},
-			event.Field{"status-code", resp.StatusCode},
-			event.Field{"output", body})
+			event.KV("error", err),
+			event.KV("status-code", resp.StatusCode),
+			event.KV("output", body))
 	}
 	return content.ResponseCode
 }

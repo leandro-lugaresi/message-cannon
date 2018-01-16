@@ -50,7 +50,7 @@ var launchCmd = &cobra.Command{
 
 		// Block until a signal is received.
 		s := <-sigs
-		log.Info("Signal received. shutting down...", event.Field{"signal", s.String()})
+		log.Info("Signal received. shutting down...", event.KV("signal", s.String()))
 		err = sup.Stop()
 		return err
 	},

@@ -33,7 +33,7 @@ func (c *consumer) Run() {
 		defer func() {
 			err := c.channel.Close()
 			if err != nil {
-				c.l.Error("Error closing the consumer channel", event.Field{"error", err})
+				c.l.Error("Error closing the consumer channel", event.KV("error", err))
 			}
 		}()
 		d, err := c.channel.Consume(c.queue, "rabbitmq-"+c.name+"-"+c.hash,
@@ -43,7 +43,7 @@ func (c *consumer) Run() {
 			c.opts.NoWait,
 			c.opts.Args)
 		if err != nil {
-			c.l.Error("Failed to start consume", event.Field{"error", err})
+			c.l.Error("Failed to start consume", event.KV("error", err))
 			return err
 		}
 		dying := c.t.Dying()
@@ -116,10 +116,10 @@ func (c *consumer) processMessage(ctx context.Context, msg amqp.Delivery) {
 	case runner.ExitNACK:
 		err = msg.Nack(false, false)
 	default:
-		c.l.Warn("The runner return an unexpected exitStatus and the message will be requeued.", event.Field{"status", status})
+		c.l.Warn("The runner return an unexpected exitStatus and the message will be requeued.", event.KV("status", status))
 		err = msg.Reject(true)
 	}
 	if err != nil {
-		c.l.Error("Error during the acknowledgement phase", event.Field{"error", err})
+		c.l.Error("Error during the acknowledgement phase", event.KV("error", err))
 	}
 }
