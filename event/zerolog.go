@@ -55,7 +55,6 @@ func NewZeroLogHandler(w io.Writer, development bool) Handler {
 	return &ZeroLogHandler{
 		log: zerolog.New(w).With().
 			Timestamp().
-			Str("app", "message-cannon").
 			Logger(),
 	}
 }
