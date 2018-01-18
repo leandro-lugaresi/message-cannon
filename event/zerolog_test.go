@@ -31,8 +31,8 @@ func TestZeroLogHandler_Handle(t *testing.T) {
 			[]Field{KV("error", errors.New(`something failed`)), KV("foo", true)},
 			`{"level":"info","error":"something failed","foo":true,"message":"info message"}`},
 		{"field with Time and Duration",
-			[]Field{KV("time", time.Date(2018, 1, 18, 2, 27, 0, 0, time.Local)), KV("duration", time.Second)},
-			`{"level":"info","time":"2018-01-18T02:27:00-02:00","duration":1000,"message":"info message"}`},
+			[]Field{KV("time", time.Date(2018, 1, 18, 2, 27, 0, 0, time.UTC)), KV("duration", time.Second)},
+			`{"level":"info","time":"2018-01-18T02:27:00Z","duration":1000,"message":"info message"}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
