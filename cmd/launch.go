@@ -17,7 +17,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 	defaults "gopkg.in/mcuadros/go-defaults.v1"
 )
 
@@ -50,7 +49,7 @@ var launchCmd = &cobra.Command{
 			}
 			factories = append(factories, rFactory)
 		}
-		err := sup.Start(factories)
+		err = sup.Start(factories)
 		if err != nil {
 			return errors.Wrap(err, "error starting the supervisor")
 		}
@@ -59,7 +58,7 @@ var launchCmd = &cobra.Command{
 
 		// Block until a signal is received.
 		s := <-sigs
-		log.Info("signal received. shutting down...", zap.String("signal", s.String()))
+		log.Info("signal received. shutting down...", event.KV("signal", s.String()))
 		return errors.Wrap(sup.Stop(), "error stopping the supervisor")
 	},
 }
