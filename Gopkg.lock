@@ -26,6 +26,12 @@
   revision = "cd527374f1e5bff4938207604a14f2e38a9cf512"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/a8m/envsubst"
+  packages = [".","parse"]
+  revision = "4e0f64a42fec73af422e6c6f4daae9c4aaf66cb0"
+
+[[projects]]
   name = "github.com/cenk/backoff"
   packages = ["."]
   revision = "61153c768f31ee5f130071d08fc82b85208528de"

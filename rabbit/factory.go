@@ -6,16 +6,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	defaults "gopkg.in/mcuadros/go-defaults.v1"
 	"gopkg.in/tomb.v2"
 
 	"github.com/leandro-lugaresi/message-cannon/event"
 	"github.com/leandro-lugaresi/message-cannon/runner"
 	"github.com/leandro-lugaresi/message-cannon/supervisor"
 	"github.com/pkg/errors"
-	"github.com/rafaeljesus/retry-go"
-	"github.com/speps/go-hashids"
+	retry "github.com/rafaeljesus/retry-go"
+	hashids "github.com/speps/go-hashids"
 	"github.com/streadway/amqp"
-	"gopkg.in/mcuadros/go-defaults.v1"
 )
 
 // Factory is the block responsible for create consumers and restart the rabbitMQ connections.
@@ -31,6 +31,10 @@ func NewFactory(config Config, log *event.Logger) (*Factory, error) {
 	conns := make(map[string]*amqp.Connection)
 	for name, cfgConn := range config.Connections {
 		defaults.SetDefaults(&cfgConn)
+		log.Debug("opening connection with rabbitMQ",
+			event.KV("sleep", cfgConn.Sleep),
+			event.KV("timeout", cfgConn.Timeout),
+			event.KV("connection", name))
 		conn, err := openConnection(cfgConn.DSN, 3, cfgConn.Sleep, cfgConn.Timeout)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error opening the connection \"%s\"", name)
@@ -94,6 +98,10 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	// Reconnect the connection when receive an connection closed error
 	if errCH != nil && errCH.Error() == amqp.ErrClosed.Error() {
 		cfgConn := f.config.Connections[cfg.Connection]
+		f.log.Warn("reopening connection closed",
+			event.KV("sleep", cfgConn.Sleep),
+			event.KV("timeout", cfgConn.Timeout),
+			event.KV("connection", cfg.Connection))
 		conn, err := openConnection(cfgConn.DSN, 5, cfgConn.Sleep, cfgConn.Timeout)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reopening the connection \"%s\"", cfg.Connection)

@@ -1,19 +1,24 @@
 package cmd
 
 import (
+	"bytes"
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/a8m/envsubst"
 	"github.com/leandro-lugaresi/message-cannon/event"
 	"github.com/leandro-lugaresi/message-cannon/rabbit"
 	"github.com/leandro-lugaresi/message-cannon/supervisor"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/mcuadros/go-defaults.v1"
+	"go.uber.org/zap"
+	defaults "gopkg.in/mcuadros/go-defaults.v1"
 )
 
 // launchCmd represents the launch command
@@ -25,6 +30,10 @@ var launchCmd = &cobra.Command{
 		log := event.NewLogger(event.NewZeroLogHandler(
 			os.Stdout,
 			viper.GetBool("development")), viper.GetInt("event-buffer"))
+		err := initConfig()
+		if err != nil {
+			return errors.Wrap(err, "failed initializing the config")
+		}
 		sup := supervisor.NewManager(viper.GetDuration("interval-checks"), log)
 		var factories []supervisor.Factory
 		if viper.InConfig("rabbitmq") {
@@ -32,27 +41,26 @@ var launchCmd = &cobra.Command{
 			err := viper.UnmarshalKey("rabbitmq", &config)
 			defaults.SetDefaults(&config)
 			if err != nil {
-				return errors.Wrap(err, "Problem unmarshaling your config into config struct")
+				return errors.Wrap(err, "problem unmarshaling your config into config struct")
 			}
 			var rFactory *rabbit.Factory
 			rFactory, err = rabbit.NewFactory(config, log)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "error creating the rabbitMQ factory")
 			}
 			factories = append(factories, rFactory)
 		}
 		err := sup.Start(factories)
 		if err != nil {
-			return errors.Wrap(err, "failed on supervisor start")
+			return errors.Wrap(err, "error starting the supervisor")
 		}
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
 		// Block until a signal is received.
 		s := <-sigs
-		log.Info("Signal received. shutting down...", event.KV("signal", s.String()))
-		err = sup.Stop()
-		return err
+		log.Info("signal received. shutting down...", zap.String("signal", s.String()))
+		return errors.Wrap(sup.Stop(), "error stopping the supervisor")
 	},
 }
 
@@ -75,4 +83,15 @@ func init() {
 		log.Fatal(err)
 	}
 	RootCmd.AddCommand(launchCmd)
+}
+
+// initConfig reads in config file and ENV variables if set.
+func initConfig() error {
+	b, err := envsubst.ReadFileRestricted(cfgFile, true, false)
+	if err != nil {
+		return errors.Wrap(err, "failed to read the file")
+	}
+	viper.SetConfigType(strings.TrimPrefix(filepath.Ext(cfgFile), "."))
+	err = viper.ReadConfig(bytes.NewBuffer(b))
+	return errors.Wrap(err, "failed to unmarshal the initial map of configs")
 }
