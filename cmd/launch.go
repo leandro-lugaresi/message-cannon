@@ -37,7 +37,7 @@ var launchCmd = &cobra.Command{
 		var factories []supervisor.Factory
 		if viper.InConfig("rabbitmq") {
 			config := rabbit.Config{}
-			err := viper.UnmarshalKey("rabbitmq", &config)
+			err = viper.UnmarshalKey("rabbitmq", &config)
 			defaults.SetDefaults(&config)
 			if err != nil {
 				return errors.Wrap(err, "problem unmarshaling your config into config struct")
