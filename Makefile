@@ -1,5 +1,5 @@
 SOURCE_FILES?=$$(go list ./... | grep -v /vendor/)
-TEST_PATTERN?=.
+TEST_PATTERN?=./...
 TEST_OPTIONS?=-race
 
 setup: ## Install all the build and lint dependencies
@@ -13,9 +13,11 @@ setup: ## Install all the build and lint dependencies
 test: ## Run all the tests
 	gotestcover $(TEST_OPTIONS) -covermode=atomic -coverprofile=coverage.txt $(SOURCE_FILES) -run $(TEST_PATTERN) -timeout=1m
 
+bench: ## Run the benchmark tests
+	go test -bench=. $(TEST_PATTERN)
+
 cover: test ## Run all the tests and opens the coverage report
-	touch coverage.out
-	go tool cover -html=coverage.out
+	go tool cover -html=coverage.txt
 
 fmt: ## gofmt and goimports all go files
 	find . -name '*.go' -not -wholename './vendor/*' | while read -r file; do gofmt -w -s "$$file"; goimports -w "$$file"; done

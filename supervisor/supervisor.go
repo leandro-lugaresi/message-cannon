@@ -4,19 +4,19 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
+	"github.com/leandro-lugaresi/message-cannon/event"
 )
 
 // Manager is the block responsible for creating all the consumers.
 // Keeping track of the current state of consumers and stop/restart consumers when needed.
 type Manager struct {
-	logger         *zap.Logger
+	logger         *event.Logger
 	checkAliveness time.Duration
 	ops            chan func(map[string]Factory, map[string]Consumer)
 }
 
 // NewManager init a new manager and wait for operations.
-func NewManager(intervalChecks time.Duration, logger *zap.Logger) *Manager {
+func NewManager(intervalChecks time.Duration, logger *event.Logger) *Manager {
 	m := &Manager{
 		logger:         logger,
 		checkAliveness: intervalChecks,
@@ -92,21 +92,21 @@ func (m *Manager) checkConsumers() {
 		m.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
 			for name, c := range consumers {
 				if !c.Alive() {
-					m.logger.Info("Recreating the consumer ", zap.String("consumer-name", name))
+					m.logger.Info("Recreating the consumer ", event.KV("consumer-name", name))
 					delete(consumers, name)
 					f, ok := factories[c.FactoryName()]
 					if !ok {
 						m.logger.Warn("Factory did not exist anymore",
-							zap.String("factory-name", c.FactoryName()),
-							zap.String("consumer-name", name))
+							event.KV("factory-name", c.FactoryName()),
+							event.KV("consumer-name", name))
 						continue
 					}
 					nc, err := f.CreateConsumer(name)
 					if err != nil {
 						m.logger.Error("Error recreating one consumer",
-							zap.Error(err),
-							zap.String("factory-name", c.FactoryName()),
-							zap.String("consumer-name", c.Name()))
+							event.KV("error", err),
+							event.KV("factory-name", c.FactoryName()),
+							event.KV("consumer-name", c.Name()))
 						continue
 					}
 					consumers[name] = nc

@@ -9,32 +9,32 @@ import (
 	defaults "gopkg.in/mcuadros/go-defaults.v1"
 	"gopkg.in/tomb.v2"
 
+	"github.com/leandro-lugaresi/message-cannon/event"
 	"github.com/leandro-lugaresi/message-cannon/runner"
 	"github.com/leandro-lugaresi/message-cannon/supervisor"
 	"github.com/pkg/errors"
 	retry "github.com/rafaeljesus/retry-go"
 	hashids "github.com/speps/go-hashids"
 	"github.com/streadway/amqp"
-	"go.uber.org/zap"
 )
 
 // Factory is the block responsible for create consumers and restart the rabbitMQ connections.
 type Factory struct {
 	config Config
 	conns  map[string]*amqp.Connection
-	log    *zap.Logger
+	log    *event.Logger
 	number int64
 }
 
 // NewFactory will open the initial connections and start the recover connections procedure.
-func NewFactory(config Config, log *zap.Logger) (*Factory, error) {
+func NewFactory(config Config, log *event.Logger) (*Factory, error) {
 	conns := make(map[string]*amqp.Connection)
 	for name, cfgConn := range config.Connections {
 		defaults.SetDefaults(&cfgConn)
 		log.Debug("opening connection with rabbitMQ",
-			zap.Duration("sleep", cfgConn.Sleep),
-			zap.Duration("timeout", cfgConn.Timeout),
-			zap.String("connection", name))
+			event.KV("sleep", cfgConn.Sleep),
+			event.KV("timeout", cfgConn.Timeout),
+			event.KV("connection", name))
 		conn, err := openConnection(cfgConn.DSN, 3, cfgConn.Sleep, cfgConn.Timeout)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error opening the connection \"%s\"", name)
@@ -82,8 +82,8 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	_, ok := f.conns[cfg.Connection]
 	if !ok {
 		available := []string{}
-		for cname := range f.conns {
-			available = append(available, cname)
+		for connName := range f.conns {
+			available = append(available, connName)
 		}
 		return nil, errors.Errorf(
 			"connection name for consumer(%s) did not exist, connections names available: %s",
@@ -91,7 +91,6 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 			strings.Join(available, ", "))
 	}
 
-	f.log.Debug("opening one connection channel", zap.String("connection", cfg.Connection))
 	var ch *amqp.Channel
 	var errCH error
 	conn := f.conns[cfg.Connection]
@@ -100,9 +99,9 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	if errCH != nil && errCH.Error() == amqp.ErrClosed.Error() {
 		cfgConn := f.config.Connections[cfg.Connection]
 		f.log.Warn("reopening connection closed",
-			zap.Duration("sleep", cfgConn.Sleep),
-			zap.Duration("timeout", cfgConn.Timeout),
-			zap.String("connection", cfg.Connection))
+			event.KV("sleep", cfgConn.Sleep),
+			event.KV("timeout", cfgConn.Timeout),
+			event.KV("connection", cfg.Connection))
 		conn, err := openConnection(cfgConn.DSN, 5, cfgConn.Sleep, cfgConn.Timeout)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reopening the connection \"%s\"", cfg.Connection)
@@ -124,8 +123,8 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 		return nil, err
 	}
 	f.log.Debug("setting QoS",
-		zap.Int("count", cfg.PrefetchCount),
-		zap.String("consumer", name))
+		event.KV("count", cfg.PrefetchCount),
+		event.KV("consumer", name))
 	if err = ch.Qos(cfg.PrefetchCount, 0, false); err != nil {
 		return nil, errors.Wrap(err, "failed to set QoS")
 	}
@@ -133,13 +132,13 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	atomic.AddInt64(&f.number, 1)
 	hashcounter, err := hash.EncodeInt64([]int64{f.number})
 	if err != nil {
-		f.log.Warn("Problem generating the hash", zap.Error(err))
+		f.log.Warn("Problem generating the hash", event.KV("error", err))
 	}
-	runner, err := runner.New(f.log.With(zap.String("consumer", name)), cfg.Runner)
+	runner, err := runner.New(f.log.With(event.KV("consumer", name)), cfg.Runner)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create the runner")
 	}
-	f.log.Info("qtd of workers", zap.Int("workers", cfg.Workers), zap.String("name", name))
+	f.log.Info("qtd of workers", event.KV("workers", cfg.Workers), event.KV("name", name))
 	return &consumer{
 		queue:       cfg.Queue.Name,
 		name:        name,
@@ -149,7 +148,7 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 		channel:     ch,
 		t:           tomb.Tomb{},
 		runner:      runner,
-		l:           f.log.With(zap.String("consumer", name)),
+		l:           f.log.With(event.KV("consumer", name)),
 		throttle:    make(chan struct{}, cfg.Workers),
 		timeout:     cfg.Runner.Timeout,
 	}, nil
@@ -160,12 +159,16 @@ func (f *Factory) declareExchange(ch *amqp.Channel, name string) error {
 		f.log.Warn("received a black exchange. wrong config?")
 		return nil
 	}
-	f.log.Debug("declaring an exchange", zap.String("exchange", name))
 	ex, ok := f.config.Exchanges[name]
 	if !ok {
-		f.log.Warn("exchange config didn't exist, we will try to continue")
+		f.log.Warn("exchange config didn't exist, we will try to continue",
+			event.KV("name", name))
 		return nil
 	}
+	f.log.Debug("declaring exchange",
+		event.KV("ex", name),
+		event.KV("type", ex.Type),
+		event.KV("options", ex.Options))
 	err := ch.ExchangeDeclare(
 		name,
 		ex.Type,
@@ -181,7 +184,9 @@ func (f *Factory) declareExchange(ch *amqp.Channel, name string) error {
 }
 
 func (f *Factory) declareQueue(ch *amqp.Channel, queue QueueConfig) error {
-	f.log.Debug("declaring a queue", zap.String("queue", queue.Name))
+	f.log.Debug("declaring queue",
+		event.KV("queue", queue.Name),
+		event.KV("options", queue.Options))
 	q, err := ch.QueueDeclare(
 		queue.Name,
 		queue.Options.Durable,
@@ -195,8 +200,8 @@ func (f *Factory) declareQueue(ch *amqp.Channel, queue QueueConfig) error {
 
 	for _, b := range queue.Bindings {
 		f.log.Debug("adding queue bind",
-			zap.String("queue", q.Name),
-			zap.String("exchange", b.Exchange))
+			event.KV("queue", q.Name),
+			event.KV("exchange", b.Exchange))
 		err = f.declareExchange(ch, b.Exchange)
 		if err != nil {
 			return err
@@ -213,10 +218,11 @@ func (f *Factory) declareQueue(ch *amqp.Channel, queue QueueConfig) error {
 }
 
 func (f *Factory) declareDeadLetters(ch *amqp.Channel, name string) error {
-	f.log.Debug("declaring a deadletter", zap.String("deadletter", name))
+	f.log.Debug("declaring deadletter", event.KV("dlx", name))
 	dead, ok := f.config.DeadLetters[name]
 	if !ok {
-		f.log.Warn("deadletter config didn't exist, we will try to continue")
+		f.log.Warn("deadletter config didn't exist, we will try to continue",
+			event.KV("dlx", name))
 		return nil
 	}
 	err := f.declareQueue(ch, dead.Queue)

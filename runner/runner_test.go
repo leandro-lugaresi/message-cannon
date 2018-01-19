@@ -3,12 +3,12 @@ package runner
 import (
 	"testing"
 
+	"github.com/leandro-lugaresi/message-cannon/event"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 )
 
 func TestNew(t *testing.T) {
-	logger := zap.NewNop()
+	logger := event.NewLogger(event.NewNoOpHandler(), 30)
 	tests := []struct {
 		name       string
 		c          Config
@@ -35,7 +35,7 @@ func TestNew(t *testing.T) {
 			&command{
 				cmd:          "/usr/bin/tail",
 				args:         []string{"-f"},
-				l:            logger,
+				log:          logger,
 				ignoreOutput: true,
 			}, false, "",
 		},
@@ -48,13 +48,13 @@ func TestNew(t *testing.T) {
 			},
 			&command{
 				cmd: "testdata/receive.php",
-				l:   logger,
+				log: logger,
 			}, false, "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := New(zap.NewNop(), tt.c)
+			got, err := New(logger, tt.c)
 			assert.Equal(t, tt.wantErr, (err != nil), "New() error = %v, wantErr %v", err, tt.wantErr)
 			if err != nil && tt.wantErr {
 				assert.EqualValues(t, tt.errMessage, err.Error(), "Error message is different than expected")
@@ -70,7 +70,7 @@ func TestNew(t *testing.T) {
 
 func TestRunShoudSetDefaults(t *testing.T) {
 	t.Run("with empty values", func(t *testing.T) {
-		got, err := New(zap.NewNop(), Config{
+		got, err := New(event.NewLogger(event.NewNoOpHandler(), 30), Config{
 			Type: "http",
 		})
 		assert.NoError(t, err)
@@ -79,7 +79,7 @@ func TestRunShoudSetDefaults(t *testing.T) {
 		assert.Equal(t, 4, httpRunner.returnOn5xx)
 	})
 	t.Run("using ack integer should overide to default", func(t *testing.T) {
-		got, err := New(zap.NewNop(), Config{
+		got, err := New(event.NewLogger(event.NewNoOpHandler(), 30), Config{
 			Type: "http",
 			Options: Options{
 				ReturnOn5xx: ExitACK,

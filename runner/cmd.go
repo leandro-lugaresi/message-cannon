@@ -8,14 +8,14 @@ import (
 
 	"os/exec"
 
+	"github.com/leandro-lugaresi/message-cannon/event"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 )
 
 type command struct {
 	cmd          string
 	args         []string
-	l            *zap.Logger
+	log          *event.Logger
 	ignoreOutput bool
 }
 
@@ -23,21 +23,21 @@ func (c *command) Process(ctx context.Context, b []byte) int {
 	cmd := exec.CommandContext(ctx, c.cmd, c.args...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		c.l.Error("Receive an error creating the stdin pipe", zap.Error(err))
+		c.log.Error("receive an error creating the stdin pipe", event.KV("error", err))
 	}
 	go func() {
 		_, pipeErr := stdin.Write(b)
 		if pipeErr != nil {
-			c.l.Error("Failed writing to stdin", zap.Error(pipeErr))
+			c.log.Error("failed writing to stdin", event.KV("error", pipeErr))
 		}
 		pipeErr = stdin.Close()
 		if pipeErr != nil {
-			c.l.Error("Failed closing stdin", zap.Error(pipeErr))
+			c.log.Error("failed closing stdin", event.KV("error", pipeErr))
 		}
 	}()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		c.l.Error("Receive an error from command", zap.Error(err), zap.ByteString("output", output))
+		c.log.Error("receive an error from command", event.KV("error", err), event.KV("output", output))
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
 				return status.ExitStatus()
@@ -47,12 +47,12 @@ func (c *command) Process(ctx context.Context, b []byte) int {
 		return ExitFailed
 	}
 	if !c.ignoreOutput && len(output) > 0 {
-		c.l.Info("message processed with output", zap.ByteString("output", output))
+		c.log.Info("message processed with output", event.KV("output", output))
 	}
 	return ExitACK
 }
 
-func newCommand(log *zap.Logger, c Config) (*command, error) {
+func newCommand(log *event.Logger, c Config) (*command, error) {
 	if split := strings.Split(c.Options.Path, " "); len(split) > 1 {
 		c.Options.Path = split[0]
 		c.Options.Args = append(split[1:], c.Options.Args...)
@@ -63,7 +63,7 @@ func newCommand(log *zap.Logger, c Config) (*command, error) {
 	cmd := command{
 		cmd:          c.Options.Path,
 		args:         c.Options.Args,
-		l:            log,
+		log:          log,
 		ignoreOutput: c.IgnoreOutput,
 	}
 	return &cmd, nil

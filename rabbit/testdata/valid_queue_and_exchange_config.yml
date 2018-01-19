@@ -45,5 +45,6 @@ rabbitmq:
             exchange: upload-picture
       runner:
         type: command
+        timeout: 10s
         options:
           path: "testdata/receive.php"
