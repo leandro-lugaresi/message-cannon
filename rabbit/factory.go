@@ -244,11 +244,14 @@ func openConnection(dsn string, retries int, sleep, timeout time.Duration) (*amq
 }
 
 func assertRightTableTypes(args amqp.Table) amqp.Table {
+	nArgs := amqp.Table{}
 	for k, v := range args {
 		switch v := v.(type) {
 		case int:
-			args[k] = int64(v)
+			nArgs[k] = int64(v)
+		default:
+			nArgs[k] = v
 		}
 	}
-	return args
+	return nArgs
 }
