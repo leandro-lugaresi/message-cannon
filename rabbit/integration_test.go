@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -22,148 +21,173 @@ import (
 )
 
 func TestIntegrationSuite(t *testing.T) {
+	tests := []struct {
+		scenario string
+		function func(*testing.T, *dockertest.Resource)
+	}{
+		{
+			scenario: "validate the behavior when we have connection trouble",
+			function: testFactoryShouldReturnConnectionErrors,
+		},
+		{
+			scenario: "validate a factory with two connections",
+			function: testFactoryWithTwoConnections,
+		},
+		{
+			scenario: "validate the behavior of one healthy consumer",
+			function: testConsumerProcess,
+		},
+		{
+			scenario: "validate that all the consumers will restart without problems",
+			function: testConsumerReconnect,
+		},
+	}
 	// -> Setup
 	dockerPool, err := dockertest.NewPool("")
 	require.NoError(t, err, "Coud not connect to docker")
 	resource, err := dockerPool.Run("rabbitmq", "3.6.12-management", []string{})
 	require.NoError(t, err, "Could not start resource")
-	config := getConfig(t, "valid_queue_and_exchange_config.yml")
-	cfg := config.Connections["default"]
-	cfg.DSN = fmt.Sprintf("amqp://localhost:%s", resource.GetPort("5672/tcp"))
-	config.Connections["default"] = cfg
 	// -> TearDown
 	defer func() {
 		if err := dockerPool.Purge(resource); err != nil {
 			t.Errorf("Could not purge resource: %s", err)
 		}
 	}()
-	t.Run("TestFactoryShouldReturnConnectionErrors", func(t *testing.T) {
-		c := getConfig(t, "valid_queue_and_exchange_config.yml")
-		t.Run("when we pass an invalid port", func(t *testing.T) {
-			conn := c.Connections["default"]
-			conn.DSN = "amqp://guest:guest@localhost:80/"
-			c.Connections["default"] = conn
-			_, err := NewFactory(c, event.NewLogger(event.NewNoOpHandler(), 30))
-			require.NotNil(t, err)
-			assert.Contains(t, err.Error(), "error opening the connection \"default\": ")
+	// -> Run!
+	for _, test := range tests {
+		t.Run(test.scenario, func(st *testing.T) {
+			test.function(st, resource)
 		})
-		t.Run("when we pass an invalid host", func(t *testing.T) {
-			conn := c.Connections["default"]
-			conn.DSN = "amqp://guest:guest@10.255.255.1:5672/"
-			c.Connections["default"] = conn
-			_, err := NewFactory(c, event.NewLogger(event.NewNoOpHandler(), 30))
-			assert.EqualError(t, err, "error opening the connection \"default\": dial tcp 10.255.255.1:5672: i/o timeout")
-		})
-	})
-	t.Run("TestFactory", func(t *testing.T) {
-		c := getConfig(t, "valid_two_connections_config.yml")
+	}
+}
+
+func testFactoryShouldReturnConnectionErrors(t *testing.T, resource *dockertest.Resource) {
+	c := getConfig(t, "valid_queue_and_exchange_config.yml")
+	t.Run("when we pass an invalid port", func(t *testing.T) {
 		conn := c.Connections["default"]
-		conn.DSN = fmt.Sprintf("amqp://localhost:%s", resource.GetPort("5672/tcp"))
+		conn.DSN = "amqp://guest:guest@localhost:80/"
 		c.Connections["default"] = conn
-		conn = c.Connections["test1"]
-		conn.DSN = fmt.Sprintf("amqp://localhost:%s", resource.GetPort("5672/tcp"))
-		c.Connections["test1"] = conn
-		factory, err := NewFactory(c, event.NewLogger(event.NewNoOpHandler(), 30))
-		require.NoError(t, err, "Failed to create the rabbitMQ factory")
-		require.Len(t, factory.conns, 2)
-		var consumers []supervisor.Consumer
-		consumers, err = factory.CreateConsumers()
-		require.NoError(t, err, "Failed to create all the consumers")
-		require.Len(t, consumers, 2, "When call CreateConsumers and we got all the consumers from config")
-		for _, consumer := range consumers {
-			assert.True(t, consumer.Alive(), "The consumer ", consumer.Name(), "is not alive")
-		}
+		_, err := NewFactory(c, event.NewLogger(event.NewNoOpHandler(), 30))
+		require.NotNil(t, err)
+		assert.Contains(t, err.Error(), "error opening the connection \"default\": ")
+	})
+	t.Run("when we pass an invalid host", func(t *testing.T) {
+		conn := c.Connections["default"]
+		conn.DSN = "amqp://guest:guest@10.255.255.1:5672/"
+		c.Connections["default"] = conn
+		_, err := NewFactory(c, event.NewLogger(event.NewNoOpHandler(), 30))
+		assert.EqualError(t, err, "error opening the connection \"default\": dial tcp 10.255.255.1:5672: i/o timeout")
+	})
+}
 
-		var consumer supervisor.Consumer
-		consumer, err = factory.CreateConsumer("test1")
-		require.NoError(t, err, "Failed to create all the consumers")
-		require.NotNil(t, consumer)
+func testFactoryWithTwoConnections(t *testing.T, resource *dockertest.Resource) {
+	c := getConfig(t, "valid_two_connections_config.yml")
+	c.Connections["default"] = setDSN(resource, c.Connections["default"])
+	c.Connections["test1"] = setDSN(resource, c.Connections["test1"])
+	factory, err := NewFactory(c, event.NewLogger(event.NewNoOpHandler(), 30))
+	require.NoError(t, err, "Failed to create the rabbitMQ factory")
+	require.Len(t, factory.conns, 2)
+	var consumers []supervisor.Consumer
+	consumers, err = factory.CreateConsumers()
+	require.NoError(t, err, "Failed to create all the consumers")
+	require.Len(t, consumers, 2, "When call CreateConsumers and we got all the consumers from config")
+	for _, consumer := range consumers {
 		assert.True(t, consumer.Alive(), "The consumer ", consumer.Name(), "is not alive")
-		ch, err := factory.conns["default"].Channel()
-		require.NoError(t, err, "Error opening a channel")
-		for _, cfg := range factory.config.Consumers {
-			_, err := ch.QueueDelete(cfg.Queue.Name, false, false, false)
-			require.NoError(t, err)
-		}
-		for name := range factory.config.Exchanges {
-			err := ch.ExchangeDelete(name, false, false)
-			require.NoError(t, err)
-		}
-	})
-	t.Run("TestConsumerProcess", func(t *testing.T) {
-		factory, err := NewFactory(config, event.NewLogger(event.NewNoOpHandler(), 30))
-		require.NoError(t, err, "Failed to create the factory")
-		cons, err := factory.CreateConsumer("test1")
-		require.NoError(t, err, "Failed to create all the consumers")
-		assert.NotNil(t, cons.(*consumer).runner, "Consumer runner must not be null")
-		runner := &mockRunner{count: 0, exitStatus: 0}
-		cons.(*consumer).runner = runner
-		cons.Run()
-		ch, err := factory.conns["default"].Channel()
-		require.NoError(t, err, "Error opening a channel")
-		for i := 0; i < 5; i++ {
-			err = ch.Publish("upload-picture", "android.profile.upload", false, false, amqp.Publishing{
-				Body: []byte(`{"fooo": "bazzz"}`),
-			})
-			require.NoError(t, err, "error publishing to rabbitMQ")
-		}
-		<-time.After(400 * time.Millisecond)
-		assert.EqualValues(t, 5, runner.messagesProcessed())
-		for _, cfg := range factory.config.Consumers {
-			_, err := ch.QueueDelete(cfg.Queue.Name, false, false, false)
-			require.NoError(t, err)
-		}
-		for name := range factory.config.Exchanges {
-			err := ch.ExchangeDelete(name, false, false)
-			require.NoError(t, err)
-		}
-	})
-	t.Run("TestConsumerReconnect", func(t *testing.T) {
-		r, w, err := os.Pipe()
-		require.NoError(t, err, "Failed to open an file pipe")
-		log := event.NewLogger(event.NewZeroLogHandler(w, false), 30)
-		factory, err := NewFactory(config, log)
-		require.NoError(t, err, "Failed to create the factory")
+	}
 
-		// start the supervisor
-		sup := supervisor.NewManager(10*time.Millisecond, log)
-		err = sup.Start([]supervisor.Factory{factory})
-		require.NoError(t, err, "Failed to start the supervisor")
-		sendMessages(t, resource, "upload-picture", "android.profile.upload", 1, 3)
-		time.Sleep(5 * time.Second)
+	var consumer supervisor.Consumer
+	consumer, err = factory.CreateConsumer("test1")
+	require.NoError(t, err, "Failed to create all the consumers")
+	require.NotNil(t, consumer)
+	assert.True(t, consumer.Alive(), "The consumer ", consumer.Name(), "is not alive")
+	ch, err := factory.conns["default"].Channel()
+	require.NoError(t, err, "Error opening a channel")
+	for _, cfg := range factory.config.Consumers {
+		_, err := ch.QueueDelete(cfg.Queue.Name, false, false, false)
+		require.NoError(t, err)
+	}
+	for name := range factory.config.Exchanges {
+		err := ch.ExchangeDelete(name, false, false)
+		require.NoError(t, err)
+	}
+}
 
-		// get the http client and force to close all the connections
-		client, err := rabbithole.NewClient(fmt.Sprintf("http://localhost:%s", resource.GetPort("15672/tcp")), "guest", "guest")
-		require.NoError(t, err, "Fail to create the rabbithole client")
-		conns, err := client.ListConnections()
-		require.NoError(t, err, "fail to get all the connections")
-		t.Logf("Found %d open connections", len(conns))
-		for _, conn := range conns {
-			_, err = client.CloseConnection(conn.Name)
-			require.NoError(t, err, "fail to close the connection ", conn.Name)
-		}
-		time.Sleep(2 * time.Second)
+func testConsumerProcess(t *testing.T, resource *dockertest.Resource) {
+	config := getConfig(t, "valid_queue_and_exchange_config.yml")
+	config.Connections["default"] = setDSN(resource, config.Connections["default"])
+	factory, err := NewFactory(config, event.NewLogger(event.NewNoOpHandler(), 30))
+	require.NoError(t, err, "Failed to create the factory")
+	cons, err := factory.CreateConsumer("test1")
+	require.NoError(t, err, "Failed to create all the consumers")
+	assert.NotNil(t, cons.(*consumer).runner, "Consumer runner must not be null")
+	runner := &mockRunner{count: 0, exitStatus: 0}
+	cons.(*consumer).runner = runner
+	cons.Run()
+	ch, err := factory.conns["default"].Channel()
+	require.NoError(t, err, "Error opening a channel")
+	for i := 0; i < 5; i++ {
+		err = ch.Publish("upload-picture", "android.profile.upload", false, false, amqp.Publishing{
+			Body: []byte(`{"fooo": "bazzz"}`),
+		})
+		require.NoError(t, err, "error publishing to rabbitMQ")
+	}
+	<-time.After(400 * time.Millisecond)
+	assert.EqualValues(t, 5, runner.messagesProcessed())
+	for _, cfg := range factory.config.Consumers {
+		_, err := ch.QueueDelete(cfg.Queue.Name, false, false, false)
+		require.NoError(t, err)
+	}
+	for name := range factory.config.Exchanges {
+		err := ch.ExchangeDelete(name, false, false)
+		require.NoError(t, err)
+	}
+}
 
-		// Emulate added some load
-		sendMessages(t, resource, "upload-picture", "android.profile.upload", 4, 6)
-		// wait the supervisor restart the consumer
-		time.Sleep(1 * time.Second)
-		err = sup.Stop()
-		require.NoError(t, err, "Failed to close the supervisor")
-		// Verify the log output
-		err = w.Close()
-		require.NoError(t, err, "Failed closing the pipe")
-		out, err := ioutil.ReadAll(r)
-		require.NoError(t, err, "failed to get the log output")
-		assert.Contains(t, string(out), `"output":"3","consumer":"test1",`)
-		assert.Contains(t, string(out), "Recreating the consumer")
-		assert.Contains(t, string(out), `"output":"6","consumer":"test1"`)
+func testConsumerReconnect(t *testing.T, resource *dockertest.Resource) {
+	config := getConfig(t, "valid_queue_and_exchange_config.yml")
+	config.Connections["default"] = setDSN(resource, config.Connections["default"])
+	var w bytes.Buffer
+	log := event.NewLogger(event.NewZeroLogHandler(&w, false), 30)
+	factory, err := NewFactory(config, log)
+	require.NoError(t, err, "Failed to create the factory")
 
-		_, err = client.DeleteQueue("/", "upload-picture")
-		require.NoError(t, err, "failed to delete the queue")
-		err = sup.Stop()
-		require.NoError(t, err, "fail to close the supervisor and consumers")
-	})
+	// start the supervisor
+	sup := supervisor.NewManager(10*time.Millisecond, log)
+	err = sup.Start([]supervisor.Factory{factory})
+	require.NoError(t, err, "Failed to start the supervisor")
+	sendMessages(t, resource, "upload-picture", "android.profile.upload", 1, 3)
+	time.Sleep(5 * time.Second)
+
+	// get the http client and force to close all the connections
+	client, err := rabbithole.NewClient(fmt.Sprintf("http://localhost:%s", resource.GetPort("15672/tcp")), "guest", "guest")
+	require.NoError(t, err, "Fail to create the rabbithole client")
+	conns, err := client.ListConnections()
+	require.NoError(t, err, "fail to get all the connections")
+	t.Logf("Found %d open connections", len(conns))
+	for _, conn := range conns {
+		_, err = client.CloseConnection(conn.Name)
+		require.NoError(t, err, "fail to close the connection ", conn.Name)
+	}
+	time.Sleep(2 * time.Second)
+
+	// Emulate added some load
+	sendMessages(t, resource, "upload-picture", "android.profile.upload", 4, 6)
+	// wait the supervisor restart the consumer
+	time.Sleep(1 * time.Second)
+	err = sup.Stop()
+	require.NoError(t, err, "Failed to close the supervisor")
+	log.Close()
+	// Verify the log output
+	out, err := ioutil.ReadAll(&w)
+	require.NoError(t, err, "failed to get the log output")
+	assert.Contains(t, string(out), `"output":"3","consumer":"test1",`)
+	assert.Contains(t, string(out), "Recreating the consumer")
+	assert.Contains(t, string(out), `"output":"6","consumer":"test1"`)
+
+	_, err = client.DeleteQueue("/", "upload-picture")
+	require.NoError(t, err, "failed to delete the queue")
+	err = sup.Stop()
+	require.NoError(t, err, "fail to close the supervisor and consumers")
 }
 
 func sendMessages(t *testing.T, resource *dockertest.Resource, ex, key string, start, count int) {
@@ -194,6 +218,11 @@ func getConfig(t *testing.T, configFile string) Config {
 	err = viper.UnmarshalKey("rabbitmq", &c)
 	assert.NoError(t, err, "Failed to marshal the config struct: ")
 	return c
+}
+
+func setDSN(resource *dockertest.Resource, conn Connection) Connection {
+	conn.DSN = fmt.Sprintf("amqp://localhost:%s", resource.GetPort("5672/tcp"))
+	return conn
 }
 
 type mockRunner struct {
