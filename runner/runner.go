@@ -23,7 +23,7 @@ const (
 
 // Runnable represent an runnable used by consumers to handle messages.
 type Runnable interface {
-	Process(context.Context, []byte) int
+	Process(context.Context, []byte, map[string]string) int
 }
 
 // Options is a composition os all options used internally by runners.

@@ -230,7 +230,7 @@ type mockRunner struct {
 	exitStatus int
 }
 
-func (m *mockRunner) Process(ctx context.Context, b []byte) int {
+func (m *mockRunner) Process(ctx context.Context, b []byte, headers map[string]string) int {
 	atomic.AddInt64(&m.count, 1)
 	return m.exitStatus
 }

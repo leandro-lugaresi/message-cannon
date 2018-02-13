@@ -21,12 +21,15 @@ type httpRunner struct {
 	returnOn5xx  int
 }
 
-func (p *httpRunner) Process(ctx context.Context, b []byte) int {
+func (p *httpRunner) Process(ctx context.Context, b []byte, headers map[string]string) int {
 	contentReader := bytes.NewReader(b)
 	req, err := http.NewRequest("POST", p.url, contentReader)
 	if err != nil {
 		p.log.Error("error creating the request", event.KV("error", err))
 		return ExitRetry
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 	for k, v := range p.headers {
 		req.Header.Set(k, v)

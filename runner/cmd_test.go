@@ -70,7 +70,7 @@ func Test_command_Process(t *testing.T) {
 				ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
 				defer cancel()
 			}
-			if got := c.Process(ctx, tt.args.b); got != tt.want {
+			if got := c.Process(ctx, tt.args.b, map[string]string{}); got != tt.want {
 				t.Errorf("command.Process() = %v, want %v", got, tt.want)
 			}
 			logger.Close()

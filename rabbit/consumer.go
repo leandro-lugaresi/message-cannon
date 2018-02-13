@@ -3,6 +3,7 @@ package rabbit
 import (
 	"context"
 	"errors"
+	"strconv"
 	"sync"
 	"time"
 
@@ -104,7 +105,9 @@ func (c *consumer) FactoryName() string {
 }
 
 func (c *consumer) processMessage(ctx context.Context, msg amqp.Delivery) {
-	status := c.runner.Process(ctx, msg.Body)
+
+	c.l.Error("receive with headers", event.KV("headers", msg.Headers))
+	status := c.runner.Process(ctx, msg.Body, getHeaders(msg))
 	var err error
 	switch status {
 	case runner.ExitACK:
@@ -122,4 +125,26 @@ func (c *consumer) processMessage(ctx context.Context, msg amqp.Delivery) {
 	if err != nil {
 		c.l.Error("Error during the acknowledgement phase", event.KV("error", err))
 	}
+}
+
+func getHeaders(msg amqp.Delivery) map[string]string {
+	headers := map[string]string{
+		"Content-Type":     msg.ContentType,
+		"Content-Encoding": msg.ContentEncoding,
+		"Correlation-Id":   msg.CorrelationId,
+		"Message-Id":       msg.MessageId,
+	}
+	xdeaths, ok := msg.Headers["x-death"].([]amqp.Table)
+	if !ok {
+		return headers
+	}
+	deathCount := 0
+	for _, xdeath := range xdeaths {
+		if xdeath["reason"] != "expired" {
+			count, _ := xdeath["count"].(int)
+			deathCount += count
+		}
+	}
+	headers["Message-Death-Count"] = strconv.Itoa(deathCount)
+	return headers
 }
