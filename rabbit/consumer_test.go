@@ -56,7 +56,7 @@ func Test_getHeaders(t *testing.T) {
 			},
 		},
 		{
-			"with message headers x-death empty",
+			"with message headers x-death",
 			amqp.Delivery{
 				Body: []byte(`foooo`),
 				Headers: amqp.Table{
