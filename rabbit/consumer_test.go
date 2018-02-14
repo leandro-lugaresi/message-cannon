@@ -61,9 +61,9 @@ func Test_getHeaders(t *testing.T) {
 				Body: []byte(`foooo`),
 				Headers: amqp.Table{
 					"x-death": []amqp.Table{
-						amqp.Table{"time": "2018-02-13T17:50:26-02:00", "count": 4, "exchange": "fallback", "queue": "fallback", "reason": "expired"},
-						amqp.Table{"time": "2018-02-13T17:50:34-02:00", "count": 1, "exchange": "fallback", "queue": "fallback", "reason": "rejected"},
-						amqp.Table{"time": "2018-02-13T17:45:26-02:00", "count": 5, "exchange": "fallback", "queue": "GenerateReport", "reason": "rejected"},
+						{"time": "2018-02-13T17:50:26-02:00", "count": 4, "exchange": "fallback", "queue": "fallback", "reason": "expired"},
+						{"time": "2018-02-13T17:50:34-02:00", "count": 1, "exchange": "fallback", "queue": "fallback", "reason": "rejected"},
+						{"time": "2018-02-13T17:45:26-02:00", "count": 5, "exchange": "fallback", "queue": "GenerateReport", "reason": "rejected"},
 					},
 				},
 			},
