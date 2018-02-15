@@ -46,33 +46,45 @@ func Test_httpRunner_Process(t *testing.T) {
 	}()
 	time.Sleep(10 * time.Millisecond)
 	tests := []struct {
-		name string
-		want int
-		msg  []byte
+		name    string
+		want    int
+		msg     []byte
+		headers map[string]string
 	}{
 		{
 			"Success response without output", ExitACK,
 			[]byte(`{"code":200, "contentType": "text/html", "message": ""}`),
+			map[string]string{},
 		},
 		{
 			"Success response with output", ExitACK,
 			[]byte(`{"code":200, "contentType": "text/html", "message": "some random content here"}`),
+			map[string]string{},
 		},
 		{
 			"200 with return-code", ExitNACK,
 			[]byte(`{"code":200, "contentType": "application/json", "message": {"response-code":3}}`),
+			map[string]string{},
 		},
 		{
 			"404 not found should retry", ExitRetry,
 			[]byte(`{"code":404, "contentType": "text/html", "message": "some random content here"}`),
+			map[string]string{},
 		},
 		{
 			"request with error", ExitNACKRequeue,
 			[]byte(`{"code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
+			map[string]string{},
 		},
 		{
 			"request with timeout", ExitRetry,
 			[]byte(`{"sleep": 4000000000, "code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
+			map[string]string{},
+		},
+		{
+			"request with headers", ExitACK,
+			[]byte(`{"code":200, "contentType": "text/html", "message": "", "returnHeaders": true}`),
+			map[string]string{"Message-Id": "123456", "Content-Type": "Application/json"},
 		},
 	}
 	for _, tt := range tests {
@@ -89,7 +101,7 @@ func Test_httpRunner_Process(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			got := runner.Process(ctx, tt.msg)
+			got := runner.Process(ctx, tt.msg, tt.headers)
 
 			logger.Close()
 			require.Equal(t, tt.want, got, "result httpRunner.Process() differs")

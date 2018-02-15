@@ -19,7 +19,7 @@ type command struct {
 	ignoreOutput bool
 }
 
-func (c *command) Process(ctx context.Context, b []byte) int {
+func (c *command) Process(ctx context.Context, b []byte, headers map[string]string) int {
 	cmd := exec.CommandContext(ctx, c.cmd, c.args...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
