@@ -37,4 +37,11 @@ snapcraft:
       daemon: simple
 dockers:
   - image: leandrolugaresi/message-cannon
-    latest: true
+    # Template of the docker tag. Defaults to `{{ .Version }}`. Other allowed
+    # fields are `.Tag`, `.Major`, `.Minor` and `.Patch` and
+    # `.Env.VARIABLE_NAME`.
+    tag_templates:
+      - "{{ .Tag }}"
+      - "v{{ .Major }}"
+      - "v{{ .Major }}.{{ .Minor }}"
+      - latest
