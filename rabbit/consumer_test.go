@@ -48,11 +48,10 @@ func Test_getHeaders(t *testing.T) {
 				},
 			},
 			map[string]string{
-				"Content-Encoding":    "",
-				"Content-Type":        "",
-				"Correlation-Id":      "",
-				"Message-Id":          "",
-				"Message-Death-Count": "0",
+				"Content-Encoding": "",
+				"Content-Type":     "",
+				"Correlation-Id":   "",
+				"Message-Id":       "",
 			},
 		},
 		{
@@ -60,19 +59,19 @@ func Test_getHeaders(t *testing.T) {
 			amqp.Delivery{
 				Body: []byte(`foooo`),
 				Headers: amqp.Table{
-					"x-death": []amqp.Table{
-						{"time": "2018-02-13T17:50:26-02:00", "count": 4, "exchange": "fallback", "queue": "fallback", "reason": "expired"},
-						{"time": "2018-02-13T17:50:34-02:00", "count": 1, "exchange": "fallback", "queue": "fallback", "reason": "rejected"},
-						{"time": "2018-02-13T17:45:26-02:00", "count": 5, "exchange": "fallback", "queue": "GenerateReport", "reason": "rejected"},
+					"x-death": []interface{}{
+						amqp.Table{"time": "2018-02-13T17:50:26-02:00", "count": int64(4), "exchange": "fallback", "queue": "fallback", "reason": "expired"},
+						amqp.Table{"time": "2018-02-13T17:50:34-02:00", "count": int64(1), "exchange": "fallback", "queue": "fallback", "reason": "rejected"},
+						amqp.Table{"time": "2018-02-13T17:45:26-02:00", "count": int64(5), "exchange": "fallback", "queue": "GenerateReport", "reason": "rejected"},
 					},
 				},
 			},
 			map[string]string{
-				"Content-Encoding":    "",
-				"Content-Type":        "",
-				"Correlation-Id":      "",
-				"Message-Id":          "",
-				"Message-Death-Count": "6",
+				"Content-Encoding": "",
+				"Content-Type":     "",
+				"Correlation-Id":   "",
+				"Message-Id":       "",
+				"Message-Deaths":   "6",
 			},
 		},
 	}

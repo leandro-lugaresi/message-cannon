@@ -105,8 +105,6 @@ func (c *consumer) FactoryName() string {
 }
 
 func (c *consumer) processMessage(ctx context.Context, msg amqp.Delivery) {
-
-	c.l.Error("receive with headers", event.KV("headers", msg.Headers))
 	status := c.runner.Process(ctx, msg.Body, getHeaders(msg))
 	var err error
 	switch status {
@@ -134,17 +132,24 @@ func getHeaders(msg amqp.Delivery) map[string]string {
 		"Correlation-Id":   msg.CorrelationId,
 		"Message-Id":       msg.MessageId,
 	}
-	xdeaths, ok := msg.Headers["x-death"].([]amqp.Table)
+	xdeaths, ok := msg.Headers["x-death"].([]interface{})
 	if !ok {
 		return headers
 	}
-	deathCount := 0
-	for _, xdeath := range xdeaths {
+	var (
+		count, deathCount int64
+		xdeath            amqp.Table
+	)
+	for _, ideath := range xdeaths {
+		xdeath, ok = ideath.(amqp.Table)
+		if !ok {
+			continue
+		}
 		if xdeath["reason"] != "expired" {
-			count, _ := xdeath["count"].(int)
+			count, _ = xdeath["count"].(int64)
 			deathCount += count
 		}
 	}
-	headers["Message-Death-Count"] = strconv.Itoa(deathCount)
+	headers["Message-Deaths"] = strconv.FormatInt(deathCount, 10)
 	return headers
 }
