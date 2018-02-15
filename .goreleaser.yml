@@ -41,7 +41,7 @@ dockers:
     # fields are `.Tag`, `.Major`, `.Minor` and `.Patch` and
     # `.Env.VARIABLE_NAME`.
     tag_templates:
-      - "{{ .Tag }}"
+      - "{{ .Version }}"
       - "v{{ .Major }}"
       - "v{{ .Major }}.{{ .Minor }}"
       - latest
