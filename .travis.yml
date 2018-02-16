@@ -14,7 +14,7 @@ before_deploy:
   - gem install fpm
   - which fpm
   - sudo apt-get update
-  - sudo apt-get install --yes snapd rpm
+  - sudo apt-get install --yes snapd rpm liblz4-dev 
   - export PATH=/snap/bin:$PATH
   - which snap
   - sudo snap install snapcraft --candidate --classic
