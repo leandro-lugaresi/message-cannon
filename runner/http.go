@@ -69,10 +69,11 @@ func (p *httpRunner) Process(ctx context.Context, b []byte, headers map[string]s
 	}{}
 	err = json.Unmarshal(body, &content)
 	if err != nil && len(body) > 0 {
-		p.log.Warn("failed to unmarshal the response",
+		p.log.Error("failed to unmarshal the response",
 			event.KV("error", err),
 			event.KV("status-code", resp.StatusCode),
 			event.KV("output", body))
+		return ExitNACKRequeue
 	}
 	return content.ResponseCode
 }
