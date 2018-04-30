@@ -46,45 +46,77 @@ func Test_httpRunner_Process(t *testing.T) {
 	}()
 	time.Sleep(10 * time.Millisecond)
 	tests := []struct {
-		name    string
-		want    int
-		msg     []byte
-		headers map[string]string
+		name         string
+		want         int
+		msg          []byte
+		headers      map[string]string
+		ignoreOutput bool
 	}{
 		{
 			"Success response without output", ExitACK,
 			[]byte(`{"code":200, "contentType": "text/html", "message": ""}`),
 			map[string]string{},
+			true,
+		},
+		{
+			"Success response without output and ignoreOutput disabled", ExitNACKRequeue,
+			[]byte(`{"code":200, "contentType": "text/html", "message": ""}`),
+			map[string]string{},
+			false,
 		},
 		{
 			"Success response with output", ExitACK,
 			[]byte(`{"code":200, "contentType": "text/html", "message": "some random content here"}`),
 			map[string]string{},
+			true,
+		},
+		{
+			"Success response with output and ignoreOutput disabled", ExitNACKRequeue,
+			[]byte(`{"code":200, "contentType": "text/html", "message": "some random content here"}`),
+			map[string]string{},
+			false,
 		},
 		{
 			"200 with return-code", ExitNACK,
-			[]byte(`{"code":200, "contentType": "application/json", "message": {"response-code":3}}`),
+			[]byte(`{"code":200, "contentType": "application/json", "message": {"error": "some error message", "other-field": 123, "response-code":3}}`),
 			map[string]string{},
+			false,
+		},
+		{
+			"200 with return-code", ExitACK,
+			[]byte(`{"code":200, "contentType": "application/json", "message": {"response-code":0}}`),
+			map[string]string{},
+			false,
+		},
+		{
+			"200 with return-code", ExitFailed,
+			[]byte(`{"code":200, "contentType": "application/json", "message": {"response-code":1}}`),
+			map[string]string{},
+			false,
 		},
 		{
 			"404 not found should retry", ExitRetry,
 			[]byte(`{"code":404, "contentType": "text/html", "message": "some random content here"}`),
 			map[string]string{},
+			false,
 		},
 		{
 			"request with error", ExitNACKRequeue,
 			[]byte(`{"code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
 			map[string]string{},
+			false,
 		},
 		{
 			"request with timeout", ExitRetry,
 			[]byte(`{"sleep": 4000000000, "code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
 			map[string]string{},
+			false,
 		},
 		{
 			"request with headers", ExitACK,
-			[]byte(`{"code":200, "contentType": "text/html", "message": "", "returnHeaders": true}`),
+			[]byte(`{"code":200, "contentType": "text/html", "message": {"response-code":0}, "returnHeaders": true}`),
 			map[string]string{"Message-Id": "123456", "Content-Type": "Application/json"},
+			false,
 		},
 	}
 	for _, tt := range tests {
@@ -92,12 +124,10 @@ func Test_httpRunner_Process(t *testing.T) {
 			logger := event.NewLogger(event.NewNoOpHandler(), 30)
 			ctx := context.Background()
 			runner, err := New(logger, Config{
-				IgnoreOutput: false,
+				IgnoreOutput: tt.ignoreOutput,
 				Type:         "http",
 				Timeout:      1 * time.Second,
-				Options: Options{
-					URL: "http://localhost:8089",
-				},
+				Options:      Options{URL: "http://localhost:8089"},
 			})
 			require.NoError(t, err)
 

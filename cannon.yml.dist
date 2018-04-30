@@ -1,7 +1,7 @@
 rabbitmq:
   connections:
     default:
-      dsn: "amqp://login:password@host:port/virtual_host"
+      dsn: "amqp://${RABBITMQ_USER:=guest}:${RABBITMQ_PASSWORD:=guest}@${RABBITMQ_HOST:=rabbitmq}:${RABBITMQ_PORT:=5672}${RABBITMQ_VHOST:=/}"
       timeout: 1s
       sleep: 500ms
     another:
@@ -66,5 +66,6 @@ rabbitmq:
         exclusive: false
       runner:
         type: command
+
         options:
           path: "testdata/receive.php"
