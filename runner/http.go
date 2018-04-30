@@ -9,13 +9,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/leandro-lugaresi/message-cannon/event"
+	"github.com/leandro-lugaresi/hub"
 )
 
 type httpRunner struct {
 	client       *http.Client
 	ignoreOutput bool
-	log          *event.Logger
+	hub          *hub.Hub
 	url          string
 	headers      map[string]string
 	returnOn5xx  int
@@ -25,7 +25,11 @@ func (p *httpRunner) Process(ctx context.Context, b []byte, headers map[string]s
 	contentReader := bytes.NewReader(b)
 	req, err := http.NewRequest("POST", p.url, contentReader)
 	if err != nil {
-		p.log.Error("error creating the request", event.KV("error", err))
+		p.hub.Publish(hub.Message{
+			Name:   "runner.http.error",
+			Body:   []byte("request creation failed"),
+			Fields: hub.Fields{"error": err},
+		})
 		return ExitRetry
 	}
 	for k, v := range headers {
@@ -36,29 +40,45 @@ func (p *httpRunner) Process(ctx context.Context, b []byte, headers map[string]s
 	}
 	resp, err := p.client.Do(req)
 	if err != nil {
-		p.log.Error("failed doing the request", event.KV("error", err))
+		p.hub.Publish(hub.Message{
+			Name:   "runner.http.error",
+			Body:   []byte("failed doing the request"),
+			Fields: hub.Fields{"error": err},
+		})
 		return ExitRetry
 	}
 	defer func() {
 		deferErr := resp.Body.Close()
 		if deferErr != nil {
-			p.log.Error("error closing the response body", event.KV("error", deferErr))
+			p.hub.Publish(hub.Message{
+				Name:   "runner.http.error",
+				Body:   []byte("error closing the response body"),
+				Fields: hub.Fields{"error": deferErr},
+			})
 		}
 	}()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		p.log.Error("error reading the response body", event.KV("error", err))
+		p.hub.Publish(hub.Message{
+			Name:   "runner.http.error",
+			Body:   []byte("error reading the response body"),
+			Fields: hub.Fields{"error": err},
+		})
 	}
 	if resp.StatusCode >= 500 {
-		p.log.Error("receive an 5xx error from request",
-			event.KV("status-code", resp.StatusCode),
-			event.KV("output", body))
+		p.hub.Publish(hub.Message{
+			Name:   "runner.http.error",
+			Body:   []byte("receive an 5xx error from request"),
+			Fields: hub.Fields{"output": body, "status-code": resp.StatusCode},
+		})
 		return p.returnOn5xx
 	}
 	if resp.StatusCode >= 400 {
-		p.log.Error("receive an 4xx error from request",
-			event.KV("status-code", resp.StatusCode),
-			event.KV("output", body))
+		p.hub.Publish(hub.Message{
+			Name:   "runner.http.error",
+			Body:   []byte("receive an 4xx error from request"),
+			Fields: hub.Fields{"output": body, "status-code": resp.StatusCode},
+		})
 		return ExitRetry
 	}
 	if p.ignoreOutput {
@@ -69,18 +89,19 @@ func (p *httpRunner) Process(ctx context.Context, b []byte, headers map[string]s
 	}{}
 	err = json.Unmarshal(body, &content)
 	if err != nil && len(body) > 0 {
-		p.log.Error("failed to unmarshal the response",
-			event.KV("error", err),
-			event.KV("status-code", resp.StatusCode),
-			event.KV("output", body))
+		p.hub.Publish(hub.Message{
+			Name:   "runner.http.error",
+			Body:   []byte("failed to unmarshal the response"),
+			Fields: hub.Fields{"error": err, "output": body, "status-code": resp.StatusCode},
+		})
 		return ExitNACKRequeue
 	}
 	return content.ResponseCode
 }
 
-func newHTTP(log *event.Logger, c Config) (*httpRunner, error) {
+func newHTTP(c Config, h *hub.Hub) (*httpRunner, error) {
 	runner := httpRunner{
-		log:          log,
+		hub:          h,
 		url:          c.Options.URL,
 		ignoreOutput: c.IgnoreOutput,
 		headers:      c.Options.Headers,

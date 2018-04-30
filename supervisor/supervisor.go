@@ -4,21 +4,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/leandro-lugaresi/message-cannon/event"
+	"github.com/leandro-lugaresi/hub"
 )
 
 // Manager is the block responsible for creating all the consumers.
 // Keeping track of the current state of consumers and stop/restart consumers when needed.
 type Manager struct {
-	logger         *event.Logger
+	hub            *hub.Hub
 	checkAliveness time.Duration
 	ops            chan func(map[string]Factory, map[string]Consumer)
 }
 
 // NewManager init a new manager and wait for operations.
-func NewManager(intervalChecks time.Duration, logger *event.Logger) *Manager {
+func NewManager(intervalChecks time.Duration, hub *hub.Hub) *Manager {
 	m := &Manager{
-		logger:         logger,
+		hub:            hub,
 		checkAliveness: intervalChecks,
 		ops:            make(chan func(map[string]Factory, map[string]Consumer)),
 	}
@@ -92,21 +92,38 @@ func (m *Manager) checkConsumers() {
 		m.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
 			for name, c := range consumers {
 				if !c.Alive() {
-					m.logger.Info("Recreating the consumer ", event.KV("consumer-name", name))
+					m.hub.Publish(hub.Message{
+						Name: "supervisor.recreating_consumer.info",
+						Body: []byte("Recreating one consumer"),
+						Fields: hub.Fields{
+							"factory-name":  c.FactoryName(),
+							"consumer-name": name,
+						},
+					})
 					delete(consumers, name)
 					f, ok := factories[c.FactoryName()]
 					if !ok {
-						m.logger.Warn("Factory did not exist anymore",
-							event.KV("factory-name", c.FactoryName()),
-							event.KV("consumer-name", name))
+						m.hub.Publish(hub.Message{
+							Name: "supervisor.recreating_consumer.warning",
+							Body: []byte("Factory did not exist anymore"),
+							Fields: hub.Fields{
+								"factory-name":  c.FactoryName(),
+								"consumer-name": name,
+							},
+						})
 						continue
 					}
 					nc, err := f.CreateConsumer(name)
 					if err != nil {
-						m.logger.Error("Error recreating one consumer",
-							event.KV("error", err),
-							event.KV("factory-name", c.FactoryName()),
-							event.KV("consumer-name", c.Name()))
+						m.hub.Publish(hub.Message{
+							Name: "supervisor.recreating_consumer.error",
+							Body: []byte("Error recreating one consumer"),
+							Fields: hub.Fields{
+								"factory-name":  c.FactoryName(),
+								"consumer-name": name,
+								"error":         err,
+							},
+						})
 						continue
 					}
 					consumers[name] = nc

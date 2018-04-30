@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/a8m/envsubst"
-	"github.com/leandro-lugaresi/message-cannon/event"
+	"github.com/leandro-lugaresi/hub"
 	"github.com/leandro-lugaresi/message-cannon/rabbit"
 	"github.com/leandro-lugaresi/message-cannon/supervisor"
 	"github.com/pkg/errors"
@@ -26,14 +26,12 @@ var launchCmd = &cobra.Command{
 	Short: "Launch will start all the consumers from the config file",
 	Long:  `Launch will start all the consumers from the config file `,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		log := event.NewLogger(event.NewZeroLogHandler(
-			os.Stdout,
-			viper.GetBool("development")), viper.GetInt("event-buffer"))
+		h := hub.New()
 		err := initConfig()
 		if err != nil {
 			return errors.Wrap(err, "failed initializing the config")
 		}
-		sup := supervisor.NewManager(viper.GetDuration("interval-checks"), log)
+		sup := supervisor.NewManager(viper.GetDuration("interval-checks"), h)
 		var factories []supervisor.Factory
 		if viper.InConfig("rabbitmq") {
 			config := rabbit.Config{}
@@ -43,7 +41,7 @@ var launchCmd = &cobra.Command{
 				return errors.Wrap(err, "problem unmarshaling your config into config struct")
 			}
 			var rFactory *rabbit.Factory
-			rFactory, err = rabbit.NewFactory(config, log)
+			rFactory, err = rabbit.NewFactory(config, h)
 			if err != nil {
 				return errors.Wrap(err, "error creating the rabbitMQ factory")
 			}
@@ -58,7 +56,11 @@ var launchCmd = &cobra.Command{
 
 		// Block until a signal is received.
 		s := <-sigs
-		log.Info("signal received. shutting down...", event.KV("signal", s.String()))
+		h.Publish(hub.Message{
+			Name:   "app.shuttdown.info",
+			Body:   []byte("signal received. shutting down..."),
+			Fields: hub.Fields{"signal": s.String()},
+		})
 		return errors.Wrap(sup.Stop(), "error stopping the supervisor")
 	},
 }

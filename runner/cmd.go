@@ -8,14 +8,14 @@ import (
 
 	"os/exec"
 
-	"github.com/leandro-lugaresi/message-cannon/event"
+	"github.com/leandro-lugaresi/hub"
 	"github.com/pkg/errors"
 )
 
 type command struct {
 	cmd          string
 	args         []string
-	log          *event.Logger
+	hub          *hub.Hub
 	ignoreOutput bool
 }
 
@@ -23,21 +23,37 @@ func (c *command) Process(ctx context.Context, b []byte, headers map[string]stri
 	cmd := exec.CommandContext(ctx, c.cmd, c.args...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		c.log.Error("receive an error creating the stdin pipe", event.KV("error", err))
+		c.hub.Publish(hub.Message{
+			Name:   "command.process.error",
+			Body:   []byte("open pipe to stdin failed"),
+			Fields: hub.Fields{"error": err},
+		})
 	}
 	go func() {
 		_, pipeErr := stdin.Write(b)
 		if pipeErr != nil {
-			c.log.Error("failed writing to stdin", event.KV("error", pipeErr))
+			c.hub.Publish(hub.Message{
+				Name:   "command.process.error",
+				Body:   []byte("failed writing to stdin"),
+				Fields: hub.Fields{"error": pipeErr},
+			})
 		}
 		pipeErr = stdin.Close()
 		if pipeErr != nil {
-			c.log.Error("failed closing stdin", event.KV("error", pipeErr))
+			c.hub.Publish(hub.Message{
+				Name:   "command.process.error",
+				Body:   []byte("close stdin failed"),
+				Fields: hub.Fields{"error": pipeErr},
+			})
 		}
 	}()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		c.log.Error("receive an error from command", event.KV("error", err), event.KV("output", output))
+		c.hub.Publish(hub.Message{
+			Name:   "runner.command.error",
+			Body:   []byte("command exec failed"),
+			Fields: hub.Fields{"error": err, "output": output},
+		})
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
 				return status.ExitStatus()
@@ -47,12 +63,16 @@ func (c *command) Process(ctx context.Context, b []byte, headers map[string]stri
 		return ExitFailed
 	}
 	if !c.ignoreOutput && len(output) > 0 {
-		c.log.Info("message processed with output", event.KV("output", output))
+		c.hub.Publish(hub.Message{
+			Name:   "runner.command.info",
+			Body:   []byte("message processed with output"),
+			Fields: hub.Fields{"output": output},
+		})
 	}
 	return ExitACK
 }
 
-func newCommand(log *event.Logger, c Config) (*command, error) {
+func newCommand(c Config, h *hub.Hub) (*command, error) {
 	if split := strings.Split(c.Options.Path, " "); len(split) > 1 {
 		c.Options.Path = split[0]
 		c.Options.Args = append(split[1:], c.Options.Args...)
@@ -63,7 +83,7 @@ func newCommand(log *event.Logger, c Config) (*command, error) {
 	cmd := command{
 		cmd:          c.Options.Path,
 		args:         c.Options.Args,
-		log:          log,
+		hub:          h,
 		ignoreOutput: c.IgnoreOutput,
 	}
 	return &cmd, nil

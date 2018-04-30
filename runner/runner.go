@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leandro-lugaresi/message-cannon/event"
+	"github.com/leandro-lugaresi/hub"
 	"github.com/pkg/errors"
 	"gopkg.in/mcuadros/go-defaults.v1"
 )
@@ -47,14 +47,14 @@ type Config struct {
 }
 
 // New create and return a Runnable based on the config type. if the type didn't exist an error is returned.
-func New(log *event.Logger, c Config) (Runnable, error) {
+func New(c Config, h *hub.Hub) (Runnable, error) {
 	defaults.SetDefaults(&c)
 	defaults.SetDefaults(&c.Options)
 	switch c.Type {
 	case "command":
-		return newCommand(log, c)
+		return newCommand(c, h)
 	case "http":
-		return newHTTP(log, c)
+		return newHTTP(c, h)
 	}
 	return nil, errors.Errorf(
 		"Invalid Runner type (\"%s\") expecting (%s)",

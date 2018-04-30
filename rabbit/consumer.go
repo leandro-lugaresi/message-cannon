@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/tomb.v2"
 
-	"github.com/leandro-lugaresi/message-cannon/event"
+	"github.com/leandro-lugaresi/hub"
 	"github.com/leandro-lugaresi/message-cannon/runner"
 	"github.com/streadway/amqp"
 )
@@ -25,7 +25,7 @@ type consumer struct {
 	opts        Options
 	channel     *amqp.Channel
 	t           tomb.Tomb
-	l           *event.Logger
+	hub         *hub.Hub
 }
 
 // Run will get the messages and pass to the runner.
@@ -34,7 +34,11 @@ func (c *consumer) Run() {
 		defer func() {
 			err := c.channel.Close()
 			if err != nil {
-				c.l.Error("Error closing the consumer channel", event.KV("error", err))
+				c.hub.Publish(hub.Message{
+					Name:   "rabbit.consumer.error",
+					Body:   []byte("Error closing the consumer channel"),
+					Fields: hub.Fields{"error": err},
+				})
 			}
 		}()
 		d, err := c.channel.Consume(c.queue, "rabbitmq-"+c.name+"-"+c.hash,
@@ -44,7 +48,11 @@ func (c *consumer) Run() {
 			c.opts.NoWait,
 			c.opts.Args)
 		if err != nil {
-			c.l.Error("Failed to start consume", event.KV("error", err))
+			c.hub.Publish(hub.Message{
+				Name:   "rabbit.consumer.error",
+				Body:   []byte("Failed to start consume"),
+				Fields: hub.Fields{"error": err},
+			})
 			return err
 		}
 		dying := c.t.Dying()
@@ -61,6 +69,10 @@ func (c *consumer) Run() {
 				return err
 			case msg := <-d:
 				if msg.Acknowledger == nil {
+					c.hub.Publish(hub.Message{
+						Name: "rabbit.consumer.error",
+						Body: []byte("receive an empty delivery. closing consumer"),
+					})
 					return errors.New("receive an empty delivery")
 				}
 				c.throttle <- struct{}{}
@@ -117,11 +129,19 @@ func (c *consumer) processMessage(ctx context.Context, msg amqp.Delivery) {
 	case runner.ExitNACK:
 		err = msg.Nack(false, false)
 	default:
-		c.l.Warn("The runner return an unexpected exitStatus and the message will be requeued.", event.KV("status", status))
+		c.hub.Publish(hub.Message{
+			Name:   "rabbit.consumer.error",
+			Body:   []byte("the runner returned an unexpected exitStatus. Message will be requeued."),
+			Fields: hub.Fields{"status": status},
+		})
 		err = msg.Reject(true)
 	}
 	if err != nil {
-		c.l.Error("Error during the acknowledgement phase", event.KV("error", err))
+		c.hub.Publish(hub.Message{
+			Name:   "rabbit.consumer.error",
+			Body:   []byte("error during the acknowledgement phase"),
+			Fields: hub.Fields{"error": err},
+		})
 	}
 }
 

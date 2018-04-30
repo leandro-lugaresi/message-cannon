@@ -2,6 +2,7 @@ package rabbit
 
 import (
 	"net"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -9,12 +10,11 @@ import (
 	defaults "gopkg.in/mcuadros/go-defaults.v1"
 	"gopkg.in/tomb.v2"
 
-	"github.com/leandro-lugaresi/message-cannon/event"
+	"github.com/leandro-lugaresi/hub"
 	"github.com/leandro-lugaresi/message-cannon/runner"
 	"github.com/leandro-lugaresi/message-cannon/supervisor"
 	"github.com/pkg/errors"
 	retry "github.com/rafaeljesus/retry-go"
-	hashids "github.com/speps/go-hashids"
 	"github.com/streadway/amqp"
 )
 
@@ -22,19 +22,24 @@ import (
 type Factory struct {
 	config Config
 	conns  map[string]*amqp.Connection
-	log    *event.Logger
+	hub    *hub.Hub
 	number int64
 }
 
 // NewFactory will open the initial connections and start the recover connections procedure.
-func NewFactory(config Config, log *event.Logger) (*Factory, error) {
+func NewFactory(config Config, h *hub.Hub) (*Factory, error) {
 	conns := make(map[string]*amqp.Connection)
 	for name, cfgConn := range config.Connections {
 		defaults.SetDefaults(&cfgConn)
-		log.Debug("opening connection with rabbitMQ",
-			event.KV("sleep", cfgConn.Sleep),
-			event.KV("timeout", cfgConn.Timeout),
-			event.KV("connection", name))
+		h.Publish(hub.Message{
+			Name: "rabbit.opening_connection.info",
+			Body: []byte("opening connection with rabbitMQ"),
+			Fields: hub.Fields{
+				"sleep":      cfgConn.Sleep,
+				"timeout":    cfgConn.Timeout,
+				"connection": name,
+			},
+		})
 		conn, err := openConnection(cfgConn.DSN, 3, cfgConn.Sleep, cfgConn.Timeout)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error opening the connection \"%s\"", name)
@@ -44,7 +49,7 @@ func NewFactory(config Config, log *event.Logger) (*Factory, error) {
 	f := &Factory{
 		config,
 		conns,
-		log,
+		h,
 		1,
 	}
 	return f, nil
@@ -98,10 +103,15 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	// Reconnect the connection when receive an connection closed error
 	if errCH != nil && errCH.Error() == amqp.ErrClosed.Error() {
 		cfgConn := f.config.Connections[cfg.Connection]
-		f.log.Warn("reopening connection closed",
-			event.KV("sleep", cfgConn.Sleep),
-			event.KV("timeout", cfgConn.Timeout),
-			event.KV("connection", cfg.Connection))
+		f.hub.Publish(hub.Message{
+			Name: "rabbit.reopening_connection.info",
+			Body: []byte("reopening one connection closed"),
+			Fields: hub.Fields{
+				"sleep":      cfgConn.Sleep,
+				"timeout":    cfgConn.Timeout,
+				"connection": cfg.Connection,
+			},
+		})
 		conn, err := openConnection(cfgConn.DSN, 5, cfgConn.Sleep, cfgConn.Timeout)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reopening the connection \"%s\"", cfg.Connection)
@@ -122,33 +132,32 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	if err != nil {
 		return nil, err
 	}
-	f.log.Debug("setting QoS",
-		event.KV("count", cfg.PrefetchCount),
-		event.KV("consumer", name))
+	f.hub.Publish(hub.Message{
+		Name: "rabbit.declare.info",
+		Body: []byte("setting QoS"),
+		Fields: hub.Fields{
+			"count":    cfg.PrefetchCount,
+			"consumer": name,
+		},
+	})
 	if err = ch.Qos(cfg.PrefetchCount, 0, false); err != nil {
 		return nil, errors.Wrap(err, "failed to set QoS")
 	}
-	hash := hashids.New()
-	atomic.AddInt64(&f.number, 1)
-	hashcounter, err := hash.EncodeInt64([]int64{f.number})
+
+	runner, err := runner.New(cfg.Runner, f.hub.With(hub.Fields{"consumer": name}))
 	if err != nil {
-		f.log.Warn("Problem generating the hash", event.KV("error", err))
+		return nil, errors.Wrap(err, "Failed creating a runner")
 	}
-	runner, err := runner.New(f.log.With(event.KV("consumer", name)), cfg.Runner)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create the runner")
-	}
-	f.log.Info("qtd of workers", event.KV("workers", cfg.Workers), event.KV("name", name))
 	return &consumer{
 		queue:       cfg.Queue.Name,
 		name:        name,
-		hash:        hashcounter,
+		hash:        strconv.FormatInt(atomic.AddInt64(&f.number, 1), 10),
 		opts:        cfg.Options,
 		factoryName: f.Name(),
 		channel:     ch,
 		t:           tomb.Tomb{},
 		runner:      runner,
-		l:           f.log.With(event.KV("consumer", name)),
+		hub:         f.hub.With(hub.Fields{"consumer": name}),
 		throttle:    make(chan struct{}, cfg.Workers),
 		timeout:     cfg.Runner.Timeout,
 	}, nil
@@ -156,19 +165,30 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 
 func (f *Factory) declareExchange(ch *amqp.Channel, name string) error {
 	if len(name) == 0 {
-		f.log.Warn("received a black exchange. wrong config?")
+		f.hub.Publish(hub.Message{
+			Name: "rabbit.declare.warning",
+			Body: []byte("receive a blank exchange. Wrong config?"),
+		})
 		return nil
 	}
 	ex, ok := f.config.Exchanges[name]
 	if !ok {
-		f.log.Warn("exchange config didn't exist, we will try to continue",
-			event.KV("name", name))
+		f.hub.Publish(hub.Message{
+			Name:   "rabbit.declare.warning",
+			Body:   []byte("exchange config didn't exist, we will try to continue"),
+			Fields: hub.Fields{"name": name},
+		})
 		return nil
 	}
-	f.log.Debug("declaring exchange",
-		event.KV("ex", name),
-		event.KV("type", ex.Type),
-		event.KV("options", ex.Options))
+	f.hub.Publish(hub.Message{
+		Name: "rabbit.declare.info",
+		Body: []byte("declaring exchange"),
+		Fields: hub.Fields{
+			"ex":      name,
+			"type":    ex.Type,
+			"options": ex.Options,
+		},
+	})
 	err := ch.ExchangeDeclare(
 		name,
 		ex.Type,
@@ -184,9 +204,14 @@ func (f *Factory) declareExchange(ch *amqp.Channel, name string) error {
 }
 
 func (f *Factory) declareQueue(ch *amqp.Channel, queue QueueConfig) error {
-	f.log.Debug("declaring queue",
-		event.KV("queue", queue.Name),
-		event.KV("options", queue.Options))
+	f.hub.Publish(hub.Message{
+		Name: "rabbit.declare.info",
+		Body: []byte("declaring queue"),
+		Fields: hub.Fields{
+			"queue":   queue.Name,
+			"options": queue.Options,
+		},
+	})
 	q, err := ch.QueueDeclare(
 		queue.Name,
 		queue.Options.Durable,
@@ -199,9 +224,14 @@ func (f *Factory) declareQueue(ch *amqp.Channel, queue QueueConfig) error {
 	}
 
 	for _, b := range queue.Bindings {
-		f.log.Debug("adding queue bind",
-			event.KV("queue", q.Name),
-			event.KV("exchange", b.Exchange))
+		f.hub.Publish(hub.Message{
+			Name: "rabbit.declare.info",
+			Body: []byte("declaring queue bind"),
+			Fields: hub.Fields{
+				"queue":    queue.Name,
+				"exchange": b.Exchange,
+			},
+		})
 		err = f.declareExchange(ch, b.Exchange)
 		if err != nil {
 			return err
@@ -218,11 +248,18 @@ func (f *Factory) declareQueue(ch *amqp.Channel, queue QueueConfig) error {
 }
 
 func (f *Factory) declareDeadLetters(ch *amqp.Channel, name string) error {
-	f.log.Debug("declaring deadletter", event.KV("dlx", name))
+	f.hub.Publish(hub.Message{
+		Name:   "rabbit.declare.info",
+		Body:   []byte("declaring deadletter"),
+		Fields: hub.Fields{"dlx": name},
+	})
 	dead, ok := f.config.DeadLetters[name]
 	if !ok {
-		f.log.Warn("deadletter config didn't exist, we will try to continue",
-			event.KV("dlx", name))
+		f.hub.Publish(hub.Message{
+			Name:   "rabbit.declare.warning",
+			Body:   []byte("deadletter config didn't exist, we will try to continue"),
+			Fields: hub.Fields{"dlx": name},
+		})
 		return nil
 	}
 	err := f.declareQueue(ch, dead.Queue)
