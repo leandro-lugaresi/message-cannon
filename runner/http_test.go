@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leandro-lugaresi/message-cannon/event"
+	"github.com/leandro-lugaresi/hub"
 	"github.com/stretchr/testify/require"
 )
 
@@ -121,19 +121,17 @@ func Test_httpRunner_Process(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := event.NewLogger(event.NewNoOpHandler(), 30)
 			ctx := context.Background()
-			runner, err := New(logger, Config{
+			runner, err := New(Config{
 				IgnoreOutput: tt.ignoreOutput,
 				Type:         "http",
 				Timeout:      1 * time.Second,
 				Options:      Options{URL: "http://localhost:8089"},
-			})
+			}, hub.New())
 			require.NoError(t, err)
 
 			got := runner.Process(ctx, tt.msg, tt.headers)
 
-			logger.Close()
 			require.Equal(t, tt.want, got, "result httpRunner.Process() differs")
 		})
 	}

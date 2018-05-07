@@ -3,12 +3,11 @@ package runner
 import (
 	"testing"
 
-	"github.com/leandro-lugaresi/message-cannon/event"
+	"github.com/leandro-lugaresi/hub"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNew(t *testing.T) {
-	logger := event.NewLogger(event.NewNoOpHandler(), 30)
 	tests := []struct {
 		name       string
 		c          Config
@@ -16,7 +15,7 @@ func TestNew(t *testing.T) {
 		wantErr    bool
 		errMessage string
 	}{
-		{"With undefined type", Config{Type: "invalid-c3"}, nil, true, "Invalid Runner type (\"invalid-c3\") expecting (command)"},
+		{"With undefined type", Config{Type: "invalid-c3"}, nil, true, "Invalid Runner type (\"invalid-c3\") expecting one of (command, http)"},
 		{
 			"With command type but with executable not found",
 			Config{
@@ -35,8 +34,8 @@ func TestNew(t *testing.T) {
 			&command{
 				cmd:          "/usr/bin/tail",
 				args:         []string{"-f"},
-				log:          logger,
 				ignoreOutput: true,
+				hub:          hub.New(),
 			}, false, "",
 		},
 		{
@@ -48,13 +47,13 @@ func TestNew(t *testing.T) {
 			},
 			&command{
 				cmd: "testdata/receive.php",
-				log: logger,
+				hub: hub.New(),
 			}, false, "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := New(logger, tt.c)
+			got, err := New(tt.c, hub.New())
 			assert.Equal(t, tt.wantErr, (err != nil), "New() error = %v, wantErr %v", err, tt.wantErr)
 			if err != nil && tt.wantErr {
 				assert.EqualValues(t, tt.errMessage, err.Error(), "Error message is different than expected")
@@ -70,21 +69,21 @@ func TestNew(t *testing.T) {
 
 func TestRunShoudSetDefaults(t *testing.T) {
 	t.Run("with empty values", func(t *testing.T) {
-		got, err := New(event.NewLogger(event.NewNoOpHandler(), 30), Config{
+		got, err := New(Config{
 			Type: "http",
-		})
+		}, hub.New())
 		assert.NoError(t, err)
 		httpRunner := got.(*httpRunner)
 		assert.Equal(t, false, httpRunner.ignoreOutput)
 		assert.Equal(t, 4, httpRunner.returnOn5xx)
 	})
 	t.Run("using ack integer should overide to default", func(t *testing.T) {
-		got, err := New(event.NewLogger(event.NewNoOpHandler(), 30), Config{
+		got, err := New(Config{
 			Type: "http",
 			Options: Options{
 				ReturnOn5xx: ExitACK,
 			},
-		})
+		}, hub.New())
 		assert.NoError(t, err)
 		httpRunner := got.(*httpRunner)
 		assert.Equal(t, 4, httpRunner.returnOn5xx)

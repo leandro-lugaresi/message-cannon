@@ -57,7 +57,7 @@ func New(c Config, h *hub.Hub) (Runnable, error) {
 		return newHTTP(c, h)
 	}
 	return nil, errors.Errorf(
-		"Invalid Runner type (\"%s\") expecting (%s)",
+		"Invalid Runner type (\"%s\") expecting one of (%s)",
 		c.Type,
-		strings.Join([]string{"command"}, ", "))
+		strings.Join([]string{"command", "http"}, ", "))
 }
