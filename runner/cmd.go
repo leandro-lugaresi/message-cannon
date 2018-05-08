@@ -13,27 +13,22 @@ import (
 )
 
 type command struct {
-	cmd          string
-	args         []string
-	hub          *hub.Hub
-	ignoreOutput bool
+	cmd  string
+	args []string
+	hub  *hub.Hub
 }
 
-func (c *command) Process(ctx context.Context, b []byte, headers map[string]string) int {
+func (c *command) Process(ctx context.Context, msg Message) (int, error) {
 	cmd := exec.CommandContext(ctx, c.cmd, c.args...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		c.hub.Publish(hub.Message{
-			Name:   "command.process.error",
-			Body:   []byte("open pipe to stdin failed"),
-			Fields: hub.Fields{"error": err},
-		})
+		return ExitNACKRequeue, errors.Wrap(err, "open pipe to stdin failed")
 	}
 	go func() {
-		_, pipeErr := stdin.Write(b)
+		_, pipeErr := stdin.Write(msg.Body)
 		if pipeErr != nil {
 			c.hub.Publish(hub.Message{
-				Name:   "command.process.error",
+				Name:   "system.log.error",
 				Body:   []byte("failed writing to stdin"),
 				Fields: hub.Fields{"error": pipeErr},
 			})
@@ -41,7 +36,7 @@ func (c *command) Process(ctx context.Context, b []byte, headers map[string]stri
 		pipeErr = stdin.Close()
 		if pipeErr != nil {
 			c.hub.Publish(hub.Message{
-				Name:   "command.process.error",
+				Name:   "system.log.error",
 				Body:   []byte("close stdin failed"),
 				Fields: hub.Fields{"error": pipeErr},
 			})
@@ -49,27 +44,18 @@ func (c *command) Process(ctx context.Context, b []byte, headers map[string]stri
 	}()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		c.hub.Publish(hub.Message{
-			Name:   "runner.command.error",
-			Body:   []byte("command exec failed"),
-			Fields: hub.Fields{"error": err, "output": output},
-		})
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-				return status.ExitStatus()
+				return status.ExitStatus(), &Error{
+					Err:        exiterr,
+					Output:     output,
+					StatusCode: status.ExitStatus(),
+				}
 			}
 		}
-
-		return ExitFailed
+		return ExitNACKRequeue, err
 	}
-	if !c.ignoreOutput && len(output) > 0 {
-		c.hub.Publish(hub.Message{
-			Name:   "runner.command.info",
-			Body:   []byte("message processed with output"),
-			Fields: hub.Fields{"output": output},
-		})
-	}
-	return ExitACK
+	return ExitACK, nil
 }
 
 func newCommand(c Config, h *hub.Hub) (*command, error) {
@@ -81,10 +67,9 @@ func newCommand(c Config, h *hub.Hub) (*command, error) {
 		return nil, errors.Errorf("The command %s didn't exist", c.Options.Path)
 	}
 	cmd := command{
-		cmd:          c.Options.Path,
-		args:         c.Options.Args,
-		hub:          h,
-		ignoreOutput: c.IgnoreOutput,
+		cmd:  c.Options.Path,
+		args: c.Options.Args,
+		hub:  h,
 	}
 	return &cmd, nil
 }

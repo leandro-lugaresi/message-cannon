@@ -6,57 +6,64 @@ import (
 	"time"
 
 	"github.com/leandro-lugaresi/hub"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_command_Process(t *testing.T) {
-	type args struct {
-		b       []byte
-		timeout bool
-	}
+	type (
+		args struct {
+			b       []byte
+			timeout bool
+		}
+		wants struct {
+			exitCode int
+			err      string
+		}
+	)
 	tests := []struct {
-		name string
-		args args
-		want int
-		msgs []hub.Message
+		name  string
+		args  args
+		wants wants
 	}{
 		{
 			"Command with success",
 			args{[]byte(`{"exitcode": 0, "delay": 100000, "info": "this is fine :)"}`), false},
-			0,
-			[]hub.Message{{
-				Name:   "runner.command.info",
-				Body:   []byte("message processed with output"),
-				Fields: hub.Fields{"output": []byte("this is fine :)")},
-			}},
+			wants{
+				ExitACK,
+				"",
+			},
 		},
 		{
 			"Command with exit 1",
 			args{[]byte(`{"exitcode": 1, "delay": 100000, "error": "Something is wrong :o"}`), false},
-			1,
-			[]hub.Message{{}},
+			wants{
+				ExitFailed,
+				"exit status 1",
+			},
 		},
 		{
 			"Command with php exception",
 			args{[]byte(`{"delay": 2000000, "exception": "Something is wrong :o"}`), false},
-			255,
-			[]hub.Message{{}},
+			wants{
+				255,
+				"exit status 255",
+			},
 		},
 		{
 			"Command with timeout",
 			args{[]byte(`{"exitcode": 0,"delay": 2000000}`), true},
-			-1,
-			[]hub.Message{{}},
+			wants{
+				-1,
+				"signal: killed",
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := hub.New()
-			subs := h.Subscribe(10, "*.*.*")
 			c := &command{
 				cmd:  "testdata/receive.php",
 				args: []string{},
-				hub:  h,
+				hub:  hub.New(),
 			}
 			ctx := context.Background()
 			if tt.args.timeout {
@@ -64,14 +71,13 @@ func Test_command_Process(t *testing.T) {
 				ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
 				defer cancel()
 			}
-			if got := c.Process(ctx, tt.args.b, map[string]string{}); got != tt.want {
-				t.Errorf("command.Process() = %v, want %v", got, tt.want)
+			exitCode, err := c.Process(ctx, Message{Body: tt.args.b, Headers: map[string]string{}})
+			if len(tt.wants.err) > 0 {
+				require.Contains(t, err.Error(), tt.wants.err)
+			} else {
+				require.NoError(t, err)
 			}
-			h.Close()
-
-			for _, msg := range tt.msgs {
-				assert.Equal(t, msg, <-subs.Receiver)
-			}
+			require.Equal(t, tt.wants.exitCode, exitCode, "command.Process wrong return value")
 		})
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/leandro-lugaresi/hub"
 	"github.com/leandro-lugaresi/message-cannon/rabbit"
 	"github.com/leandro-lugaresi/message-cannon/supervisor"
+	"github.com/oklog/run"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -31,37 +32,32 @@ var launchCmd = &cobra.Command{
 		if err != nil {
 			return errors.Wrap(err, "failed initializing the config")
 		}
-		sup := supervisor.NewManager(viper.GetDuration("interval-checks"), h)
-		var factories []supervisor.Factory
-		if viper.InConfig("rabbitmq") {
-			config := rabbit.Config{}
-			err = viper.UnmarshalKey("rabbitmq", &config)
-			defaults.SetDefaults(&config)
-			if err != nil {
-				return errors.Wrap(err, "problem unmarshaling your config into config struct")
-			}
-			var rFactory *rabbit.Factory
-			rFactory, err = rabbit.NewFactory(config, h)
-			if err != nil {
-				return errors.Wrap(err, "error creating the rabbitMQ factory")
-			}
-			factories = append(factories, rFactory)
-		}
-		err = sup.Start(factories)
-		if err != nil {
-			return errors.Wrap(err, "error starting the supervisor")
-		}
-		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
-		// Block until a signal is received.
-		s := <-sigs
-		h.Publish(hub.Message{
-			Name:   "app.shuttdown.info",
-			Body:   []byte("signal received. shutting down..."),
-			Fields: hub.Fields{"signal": s.String()},
+		factories, err := getFactories(h)
+		if err != nil {
+			return err
+		}
+
+		cancelchan := make(chan struct{})
+		var g run.Group
+		g.Add(func() error {
+			return interrupt(cancelchan)
+		}, func(error) {
+			close(cancelchan)
 		})
-		return errors.Wrap(sup.Stop(), "error stopping the supervisor")
+
+		sup := supervisor.NewManager(viper.GetDuration("interval-checks"), h)
+		g.Add(func() error {
+			return sup.Start(factories)
+		}, func(error) {
+			err := sup.Stop()
+			if err != nil {
+				log.Printf("failed to stop the supervisor: %v", err)
+			}
+		})
+
+		log.Println("start actors...")
+		return g.Run()
 	},
 }
 
@@ -95,4 +91,34 @@ func initConfig() error {
 	viper.SetConfigType(strings.TrimPrefix(filepath.Ext(cfgFile), "."))
 	err = viper.ReadConfig(bytes.NewBuffer(b))
 	return errors.Wrap(err, "failed to unmarshal the initial map of configs")
+}
+
+func getFactories(h *hub.Hub) ([]supervisor.Factory, error) {
+	var factories []supervisor.Factory
+	if viper.InConfig("rabbitmq") {
+		config := rabbit.Config{}
+		err := viper.UnmarshalKey("rabbitmq", &config)
+		defaults.SetDefaults(&config)
+		if err != nil {
+			return factories, errors.Wrap(err, "problem unmarshaling your config into config struct")
+		}
+		var rFactory *rabbit.Factory
+		rFactory, err = rabbit.NewFactory(config, h)
+		if err != nil {
+			return factories, errors.Wrap(err, "error creating the rabbitMQ factory")
+		}
+		factories = append(factories, rFactory)
+	}
+	return factories, nil
+}
+
+func interrupt(cancel <-chan struct{}) error {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	select {
+	case sig := <-c:
+		return errors.Errorf("received signal %s. shutting down...", sig)
+	case <-cancel:
+		return errors.New("canceled")
+	}
 }

@@ -45,77 +45,129 @@ func Test_httpRunner_Process(t *testing.T) {
 		t.Error(http.ListenAndServe("localhost:8089", mux))
 	}()
 	time.Sleep(10 * time.Millisecond)
+
+	type (
+		args struct {
+			b       []byte
+			headers map[string]string
+		}
+		wants struct {
+			exitCode int
+			err      string
+		}
+	)
 	tests := []struct {
 		name         string
-		want         int
-		msg          []byte
-		headers      map[string]string
+		args         args
+		wants        wants
 		ignoreOutput bool
 	}{
 		{
-			"Success response without output", ExitACK,
-			[]byte(`{"code":200, "contentType": "text/html", "message": ""}`),
-			map[string]string{},
+			"Success response without output",
+			args{
+				[]byte(`{"code":200, "contentType": "text/html", "message": ""}`),
+				map[string]string{},
+			},
+			wants{
+				ExitACK,
+				"",
+			},
 			true,
 		},
 		{
-			"Success response without output and ignoreOutput disabled", ExitNACKRequeue,
-			[]byte(`{"code":200, "contentType": "text/html", "message": ""}`),
-			map[string]string{},
+			"Success response without output and ignoreOutput disabled",
+			args{
+				[]byte(`{"code":200, "contentType": "text/html", "message": ""}`),
+				map[string]string{},
+			},
+			wants{
+				ExitNACKRequeue,
+				"json: cannot unmarshal string into Go value of type struct",
+			},
 			false,
 		},
 		{
-			"Success response with output", ExitACK,
-			[]byte(`{"code":200, "contentType": "text/html", "message": "some random content here"}`),
-			map[string]string{},
+			"Success response with output and ignoring the output",
+			args{
+				[]byte(`{"code":200, "contentType": "text/html", "message": "some random content here"}`),
+				map[string]string{},
+			},
+			wants{
+				ExitACK,
+				"",
+			},
 			true,
 		},
 		{
-			"Success response with output and ignoreOutput disabled", ExitNACKRequeue,
-			[]byte(`{"code":200, "contentType": "text/html", "message": "some random content here"}`),
-			map[string]string{},
+			"200 with return-code",
+			args{
+				[]byte(`{"code":200, "contentType": "application/json", "message": {"response-code":0}}`),
+				map[string]string{},
+			},
+			wants{
+				ExitACK,
+				"",
+			},
 			false,
 		},
 		{
-			"200 with return-code", ExitNACK,
-			[]byte(`{"code":200, "contentType": "application/json", "message": {"error": "some error message", "other-field": 123, "response-code":3}}`),
-			map[string]string{},
+			"200 with return-code",
+			args{
+				[]byte(`{"code":200, "contentType": "application/json", "message": {"response-code":1}}`),
+				map[string]string{},
+			},
+			wants{
+				ExitFailed,
+				"",
+			},
 			false,
 		},
 		{
-			"200 with return-code", ExitACK,
-			[]byte(`{"code":200, "contentType": "application/json", "message": {"response-code":0}}`),
-			map[string]string{},
+			"404 not found should NACK and requeue",
+			args{
+				[]byte(`{"code":404, "contentType": "text/html", "message": "some random content here"}`),
+				map[string]string{},
+			},
+			wants{
+				ExitNACKRequeue,
+				"receive an 4xx error from request",
+			},
 			false,
 		},
 		{
-			"200 with return-code", ExitFailed,
-			[]byte(`{"code":200, "contentType": "application/json", "message": {"response-code":1}}`),
-			map[string]string{},
+			"request with error",
+			args{
+				[]byte(`{"code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
+				map[string]string{},
+			},
+			wants{
+				ExitNACKRequeue,
+				"receive an 5xx error from request",
+			},
 			false,
 		},
 		{
-			"404 not found should retry", ExitRetry,
-			[]byte(`{"code":404, "contentType": "text/html", "message": "some random content here"}`),
-			map[string]string{},
+			"request with timeout",
+			args{
+				[]byte(`{"sleep": 4000000000, "code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
+				map[string]string{},
+			},
+			wants{
+				ExitTimeout,
+				"Client.Timeout exceeded while awaiting headers",
+			},
 			false,
 		},
 		{
-			"request with error", ExitNACKRequeue,
-			[]byte(`{"code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
-			map[string]string{},
-			false,
-		},
-		{
-			"request with timeout", ExitRetry,
-			[]byte(`{"sleep": 4000000000, "code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
-			map[string]string{},
-			false,
-		},
-		{
-			"request with headers", ExitACK,
-			[]byte(`{"code":200, "contentType": "text/html", "message": {"response-code":0}, "returnHeaders": true}`),
-			map[string]string{"Message-Id": "123456", "Content-Type": "Application/json"},
+			"request with headers",
+			args{
+				[]byte(`{"code":200, "contentType": "text/html", "message": {"response-code":0}, "returnHeaders": true}`),
+				map[string]string{"Message-Id": "123456", "Content-Type": "Application/json"},
+			},
+			wants{
+				ExitACK,
+				"",
+			},
 			false,
 		},
 	}
@@ -130,9 +182,13 @@ func Test_httpRunner_Process(t *testing.T) {
 			}, hub.New())
 			require.NoError(t, err)
 
-			got := runner.Process(ctx, tt.msg, tt.headers)
-
-			require.Equal(t, tt.want, got, "result httpRunner.Process() differs")
+			got, err := runner.Process(ctx, Message{Body: tt.args.b, Headers: tt.args.headers})
+			if len(tt.wants.err) > 0 {
+				require.Contains(t, err.Error(), tt.wants.err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tt.wants.exitCode, got, "result httpRunner.Process() differs")
 		})
 	}
 }

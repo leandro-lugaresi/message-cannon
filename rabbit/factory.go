@@ -166,8 +166,9 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 func (f *Factory) declareExchange(ch *amqp.Channel, name string) error {
 	if len(name) == 0 {
 		f.hub.Publish(hub.Message{
-			Name: "rabbit.declare.warning",
-			Body: []byte("receive a blank exchange. Wrong config?"),
+			Name:   "rabbit.declare.warning",
+			Body:   []byte("receive a blank exchange. Wrong config?"),
+			Fields: hub.Fields{},
 		})
 		return nil
 	}

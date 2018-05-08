@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leandro-lugaresi/message-cannon/event"
+	"github.com/leandro-lugaresi/hub"
+	"github.com/leandro-lugaresi/message-cannon/runner"
 	"github.com/leandro-lugaresi/message-cannon/supervisor"
 	rabbithole "github.com/michaelklishin/rabbit-hole"
 	"github.com/spf13/viper"
@@ -67,7 +68,7 @@ func testFactoryShouldReturnConnectionErrors(t *testing.T, resource *dockertest.
 		conn := c.Connections["default"]
 		conn.DSN = "amqp://guest:guest@localhost:80/"
 		c.Connections["default"] = conn
-		_, err := NewFactory(c, event.NewLogger(event.NewNoOpHandler(), 30))
+		_, err := NewFactory(c, hub.New())
 		require.NotNil(t, err)
 		assert.Contains(t, err.Error(), "error opening the connection \"default\": ")
 	})
@@ -75,7 +76,7 @@ func testFactoryShouldReturnConnectionErrors(t *testing.T, resource *dockertest.
 		conn := c.Connections["default"]
 		conn.DSN = "amqp://guest:guest@10.255.255.1:5672/"
 		c.Connections["default"] = conn
-		_, err := NewFactory(c, event.NewLogger(event.NewNoOpHandler(), 30))
+		_, err := NewFactory(c, hub.New())
 		assert.EqualError(t, err, "error opening the connection \"default\": dial tcp 10.255.255.1:5672: i/o timeout")
 	})
 }
@@ -84,7 +85,7 @@ func testFactoryWithTwoConnections(t *testing.T, resource *dockertest.Resource) 
 	c := getConfig(t, "valid_two_connections_config.yml")
 	c.Connections["default"] = setDSN(resource, c.Connections["default"])
 	c.Connections["test1"] = setDSN(resource, c.Connections["test1"])
-	factory, err := NewFactory(c, event.NewLogger(event.NewNoOpHandler(), 30))
+	factory, err := NewFactory(c, hub.New())
 	require.NoError(t, err, "Failed to create the rabbitMQ factory")
 	require.Len(t, factory.conns, 2)
 	var consumers []supervisor.Consumer
@@ -115,13 +116,13 @@ func testFactoryWithTwoConnections(t *testing.T, resource *dockertest.Resource) 
 func testConsumerProcess(t *testing.T, resource *dockertest.Resource) {
 	config := getConfig(t, "valid_queue_and_exchange_config.yml")
 	config.Connections["default"] = setDSN(resource, config.Connections["default"])
-	factory, err := NewFactory(config, event.NewLogger(event.NewNoOpHandler(), 30))
+	factory, err := NewFactory(config, hub.New())
 	require.NoError(t, err, "Failed to create the factory")
 	cons, err := factory.CreateConsumer("test1")
 	require.NoError(t, err, "Failed to create all the consumers")
 	assert.NotNil(t, cons.(*consumer).runner, "Consumer runner must not be null")
-	runner := &mockRunner{count: 0, exitStatus: 0}
-	cons.(*consumer).runner = runner
+	mock := &mockRunner{count: 0, exitStatus: 0}
+	cons.(*consumer).runner = mock
 	cons.Run()
 	ch, err := factory.conns["default"].Channel()
 	require.NoError(t, err, "Error opening a channel")
@@ -132,7 +133,7 @@ func testConsumerProcess(t *testing.T, resource *dockertest.Resource) {
 		require.NoError(t, err, "error publishing to rabbitMQ")
 	}
 	<-time.After(400 * time.Millisecond)
-	assert.EqualValues(t, 5, runner.messagesProcessed())
+	assert.EqualValues(t, 5, mock.messagesProcessed())
 	for _, cfg := range factory.config.Consumers {
 		_, err := ch.QueueDelete(cfg.Queue.Name, false, false, false)
 		require.NoError(t, err)
@@ -146,46 +147,31 @@ func testConsumerProcess(t *testing.T, resource *dockertest.Resource) {
 func testConsumerReconnect(t *testing.T, resource *dockertest.Resource) {
 	config := getConfig(t, "valid_queue_and_exchange_config.yml")
 	config.Connections["default"] = setDSN(resource, config.Connections["default"])
-	var w bytes.Buffer
-	log := event.NewLogger(event.NewZeroLogHandler(&w, false), 30)
-	factory, err := NewFactory(config, log)
+	h := hub.New()
+	reconectionSubscriber := h.Subscribe(10, "supervisor.recreating_consumer.*")
+	processSubscriber := h.Subscribe(10, "rabbit.process.sucess")
+	factory, err := NewFactory(config, h)
 	require.NoError(t, err, "Failed to create the factory")
 
 	// start the supervisor
-	sup := supervisor.NewManager(10*time.Millisecond, log)
+	sup := supervisor.NewManager(10*time.Millisecond, h)
 	err = sup.Start([]supervisor.Factory{factory})
 	require.NoError(t, err, "Failed to start the supervisor")
 	sendMessages(t, resource, "upload-picture", "android.profile.upload", 1, 3)
 	time.Sleep(5 * time.Second)
 
 	// get the http client and force to close all the connections
-	client, err := rabbithole.NewClient(fmt.Sprintf("http://localhost:%s", resource.GetPort("15672/tcp")), "guest", "guest")
-	require.NoError(t, err, "Fail to create the rabbithole client")
-	conns, err := client.ListConnections()
-	require.NoError(t, err, "fail to get all the connections")
-	t.Logf("Found %d open connections", len(conns))
-	for _, conn := range conns {
-		_, err = client.CloseConnection(conn.Name)
-		require.NoError(t, err, "fail to close the connection ", conn.Name)
-	}
-	time.Sleep(2 * time.Second)
+	go closeRabbitMQConnections(t, resource)
+	//receive the message of consumer reconnect
+	<-reconectionSubscriber.Receiver
 
-	// Emulate added some load
+	// send new messages
 	sendMessages(t, resource, "upload-picture", "android.profile.upload", 4, 6)
-	// wait the supervisor restart the consumer
 	time.Sleep(1 * time.Second)
 	err = sup.Stop()
 	require.NoError(t, err, "Failed to close the supervisor")
-	log.Close()
-	// Verify the log output
-	out, err := ioutil.ReadAll(&w)
-	require.NoError(t, err, "failed to get the log output")
-	assert.Contains(t, string(out), `"output":"3","consumer":"test1",`)
-	assert.Contains(t, string(out), "Recreating the consumer")
-	assert.Contains(t, string(out), `"output":"6","consumer":"test1"`)
-
-	_, err = client.DeleteQueue("/", "upload-picture")
-	require.NoError(t, err, "failed to delete the queue")
+	// Verify if process all 6 messages
+	require.Len(t, processSubscriber.Receiver, 6, "processSubscriber should have 6 messages")
 	err = sup.Stop()
 	require.NoError(t, err, "fail to close the supervisor and consumers")
 }
@@ -225,14 +211,26 @@ func setDSN(resource *dockertest.Resource, conn Connection) Connection {
 	return conn
 }
 
+func closeRabbitMQConnections(t *testing.T, resource *dockertest.Resource) {
+	client, err := rabbithole.NewClient(fmt.Sprintf("http://localhost:%s", resource.GetPort("15672/tcp")), "guest", "guest")
+	require.NoError(t, err, "Fail to create the rabbithole client")
+	conns, err := client.ListConnections()
+	require.NoError(t, err, "fail to get all the connections")
+	t.Logf("Found %d open connections", len(conns))
+	for _, conn := range conns {
+		_, err = client.CloseConnection(conn.Name)
+		require.NoError(t, err, "fail to close the connection ", conn.Name)
+	}
+}
+
 type mockRunner struct {
 	count      int64
 	exitStatus int
 }
 
-func (m *mockRunner) Process(ctx context.Context, b []byte, headers map[string]string) int {
+func (m *mockRunner) Process(ctx context.Context, msg runner.Message) (int, error) {
 	atomic.AddInt64(&m.count, 1)
-	return m.exitStatus
+	return m.exitStatus, nil
 }
 
 func (m *mockRunner) messagesProcessed() int64 {

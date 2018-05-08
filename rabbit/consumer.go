@@ -70,8 +70,9 @@ func (c *consumer) Run() {
 			case msg := <-d:
 				if msg.Acknowledger == nil {
 					c.hub.Publish(hub.Message{
-						Name: "rabbit.consumer.error",
-						Body: []byte("receive an empty delivery. closing consumer"),
+						Name:   "rabbit.consumer.error",
+						Body:   []byte("receive an empty delivery. closing consumer"),
+						Fields: hub.Fields{},
 					})
 					return errors.New("receive an empty delivery")
 				}
@@ -117,8 +118,30 @@ func (c *consumer) FactoryName() string {
 }
 
 func (c *consumer) processMessage(ctx context.Context, msg amqp.Delivery) {
-	status := c.runner.Process(ctx, msg.Body, getHeaders(msg))
 	var err error
+	start := time.Now()
+	status, err := c.runner.Process(ctx, runner.Message{Body: msg.Body, Headers: getHeaders(msg)})
+	duration := time.Now().Sub(start)
+	fields := hub.Fields{
+		"duration":    duration,
+		"status-code": status,
+	}
+	topic := "rabbit.process.sucess"
+	if err != nil {
+		topic = "rabbit.process.error"
+		switch e := err.(type) {
+		case *runner.Error:
+			fields["error"] = e.Err
+			fields["exit-code"] = e.StatusCode
+			fields["output"] = e.Output
+		default:
+			fields["error"] = e
+		}
+	}
+	c.hub.Publish(hub.Message{
+		Name:   topic,
+		Fields: fields,
+	})
 	switch status {
 	case runner.ExitACK:
 		err = msg.Ack(false)

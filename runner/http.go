@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/leandro-lugaresi/hub"
+	"github.com/pkg/errors"
 )
 
 type httpRunner struct {
@@ -21,37 +22,74 @@ type httpRunner struct {
 	returnOn5xx  int
 }
 
-func (p *httpRunner) Process(ctx context.Context, b []byte, headers map[string]string) int {
-	contentReader := bytes.NewReader(b)
+func (p *httpRunner) Process(ctx context.Context, msg Message) (int, error) {
+	req, err := p.prepareRequest(msg)
+	if err != nil {
+		return ExitNACKRequeue, errors.Wrap(err, "request creation failed")
+	}
+	resp, body, err := p.executeRequest(req)
+	if err != nil {
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			return ExitTimeout, &Error{Err: netErr, StatusCode: -1}
+		}
+		return ExitNACKRequeue, errors.Wrap(err, "failed doing the request")
+	}
+	if resp.StatusCode >= 500 {
+		return p.returnOn5xx, &Error{
+			Err:        errors.New("receive an 5xx error from request"),
+			StatusCode: resp.StatusCode,
+			Output:     body,
+		}
+	}
+	if resp.StatusCode >= 400 {
+		return ExitNACKRequeue, &Error{
+			Err:        errors.New("receive an 4xx error from request"),
+			StatusCode: resp.StatusCode,
+			Output:     body,
+		}
+	}
+	if p.ignoreOutput {
+		return ExitACK, nil
+	}
+	content := struct {
+		ResponseCode int `json:"response-code"`
+	}{}
+	err = json.Unmarshal(body, &content)
+	if err != nil && len(body) > 0 {
+		return ExitNACKRequeue, &Error{
+			Err:        err,
+			StatusCode: resp.StatusCode,
+			Output:     body,
+		}
+	}
+	return content.ResponseCode, nil
+}
+
+func (p *httpRunner) prepareRequest(msg Message) (*http.Request, error) {
+	contentReader := bytes.NewReader(msg.Body)
 	req, err := http.NewRequest("POST", p.url, contentReader)
 	if err != nil {
-		p.hub.Publish(hub.Message{
-			Name:   "runner.http.error",
-			Body:   []byte("request creation failed"),
-			Fields: hub.Fields{"error": err},
-		})
-		return ExitRetry
+		return req, err
 	}
-	for k, v := range headers {
+	for k, v := range msg.Headers {
 		req.Header.Set(k, v)
 	}
 	for k, v := range p.headers {
 		req.Header.Set(k, v)
 	}
+	return req, nil
+}
+
+func (p *httpRunner) executeRequest(req *http.Request) (*http.Response, []byte, error) {
 	resp, err := p.client.Do(req)
 	if err != nil {
-		p.hub.Publish(hub.Message{
-			Name:   "runner.http.error",
-			Body:   []byte("failed doing the request"),
-			Fields: hub.Fields{"error": err},
-		})
-		return ExitRetry
+		return resp, []byte{}, err
 	}
 	defer func() {
 		deferErr := resp.Body.Close()
 		if deferErr != nil {
 			p.hub.Publish(hub.Message{
-				Name:   "runner.http.error",
+				Name:   "system.log.error",
 				Body:   []byte("error closing the response body"),
 				Fields: hub.Fields{"error": deferErr},
 			})
@@ -60,43 +98,12 @@ func (p *httpRunner) Process(ctx context.Context, b []byte, headers map[string]s
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		p.hub.Publish(hub.Message{
-			Name:   "runner.http.error",
+			Name:   "system.log.error",
 			Body:   []byte("error reading the response body"),
 			Fields: hub.Fields{"error": err},
 		})
 	}
-	if resp.StatusCode >= 500 {
-		p.hub.Publish(hub.Message{
-			Name:   "runner.http.error",
-			Body:   []byte("receive an 5xx error from request"),
-			Fields: hub.Fields{"output": body, "status-code": resp.StatusCode},
-		})
-		return p.returnOn5xx
-	}
-	if resp.StatusCode >= 400 {
-		p.hub.Publish(hub.Message{
-			Name:   "runner.http.error",
-			Body:   []byte("receive an 4xx error from request"),
-			Fields: hub.Fields{"output": body, "status-code": resp.StatusCode},
-		})
-		return ExitRetry
-	}
-	if p.ignoreOutput {
-		return ExitACK
-	}
-	content := struct {
-		ResponseCode int `json:"response-code"`
-	}{}
-	err = json.Unmarshal(body, &content)
-	if err != nil && len(body) > 0 {
-		p.hub.Publish(hub.Message{
-			Name:   "runner.http.error",
-			Body:   []byte("failed to unmarshal the response"),
-			Fields: hub.Fields{"error": err, "output": body, "status-code": resp.StatusCode},
-		})
-		return ExitNACKRequeue
-	}
-	return content.ResponseCode
+	return resp, body, nil
 }
 
 func newHTTP(c Config, h *hub.Hub) (*httpRunner, error) {

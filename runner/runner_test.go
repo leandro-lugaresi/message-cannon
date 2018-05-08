@@ -32,18 +32,16 @@ func TestNew(t *testing.T) {
 				IgnoreOutput: true,
 			},
 			&command{
-				cmd:          "/usr/bin/tail",
-				args:         []string{"-f"},
-				ignoreOutput: true,
-				hub:          hub.New(),
+				cmd:  "/usr/bin/tail",
+				args: []string{"-f"},
+				hub:  hub.New(),
 			}, false, "",
 		},
 		{
 			"With an valid command and did not ignore output",
 			Config{
-				Type:         "command",
-				Options:      Options{Path: "testdata/receive.php"},
-				IgnoreOutput: false,
+				Type:    "command",
+				Options: Options{Path: "testdata/receive.php"},
 			},
 			&command{
 				cmd: "testdata/receive.php",
