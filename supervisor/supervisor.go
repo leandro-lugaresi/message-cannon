@@ -22,6 +22,7 @@ func NewManager(intervalChecks time.Duration, hub *hub.Hub) *Manager {
 		checkAliveness: intervalChecks,
 		ops:            make(chan func(map[string]Factory, map[string]Consumer)),
 	}
+	go m.work()
 	return m
 }
 
@@ -87,10 +88,10 @@ func (m *Manager) Stop() error {
 
 // CheckConsumers will tick and send operations to do some checks
 func (m *Manager) CheckConsumers(cancel <-chan struct{}) {
-	tick := time.Tick(m.checkAliveness)
+	ticker := time.NewTicker(m.checkAliveness)
 	for {
 		select {
-		case <-tick:
+		case <-ticker.C:
 			m.ops <- m.restartDeadConsumers
 		case <-cancel:
 			return
