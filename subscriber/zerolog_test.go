@@ -24,7 +24,7 @@ func TestLogSubscriber(t *testing.T) {
 				Body:   []byte("info message"),
 				Fields: hub.Fields{"foo": "baz"},
 			},
-			`{"level":"info","foo":"baz","message":"info message"}`,
+			`{"level":"debug","foo":"baz","message":"info message"}`,
 		},
 		{
 			"field with floats",
@@ -78,15 +78,15 @@ func TestLogSubscriber(t *testing.T) {
 				Body:   []byte("fooooo"),
 				Fields: hub.Fields{"struct": struct{ Key, Value string }{Key: "fooo", Value: "baz"}},
 			},
-			`{"level":"info","struct": {"Key":"fooo","Value":"baz"},"message":"fooooo"}`,
+			`{"level":"debug","struct": {"Key":"fooo","Value":"baz"},"message":"fooooo"}`,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := hub.New()
 			w := &bytes.Buffer{}
-			log := &LogSubscriber{
-				logger: zerolog.New(w),
+			log := &Logger{
+				Logger: zerolog.New(w),
 				sub:    h.Subscribe(0, "*.*.*"),
 				done:   make(chan struct{}),
 			}

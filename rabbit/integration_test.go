@@ -155,7 +155,6 @@ func testConsumerReconnect(t *testing.T, resource *dockertest.Resource) {
 
 	// start the supervisor
 	sup := supervisor.NewManager(10*time.Millisecond, h)
-	go sup.CheckConsumers(make(chan struct{}))
 	err = sup.Start([]supervisor.Factory{factory})
 	require.NoError(t, err, "Failed to start the supervisor")
 	sendMessages(t, resource, "upload-picture", "android.profile.upload", 1, 3)

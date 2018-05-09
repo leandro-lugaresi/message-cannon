@@ -22,7 +22,9 @@ func NewManager(intervalChecks time.Duration, hub *hub.Hub) *Manager {
 		checkAliveness: intervalChecks,
 		ops:            make(chan func(map[string]Factory, map[string]Consumer)),
 	}
+	//we use a Manager as a program structure and didn`t need to close this goroutines
 	go m.work()
+	go m.checkConsumers()
 	return m
 }
 
@@ -86,16 +88,11 @@ func (m *Manager) Stop() error {
 	return nil
 }
 
-// CheckConsumers will tick and send operations to do some checks
-func (m *Manager) CheckConsumers(cancel <-chan struct{}) {
+// checkConsumers will tick and send operations to do some checks
+func (m *Manager) checkConsumers() {
 	ticker := time.NewTicker(m.checkAliveness)
-	for {
-		select {
-		case <-ticker.C:
-			m.ops <- m.restartDeadConsumers
-		case <-cancel:
-			return
-		}
+	for range ticker.C {
+		m.ops <- m.restartDeadConsumers
 	}
 }
 

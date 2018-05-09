@@ -15,7 +15,6 @@ import (
 	"github.com/leandro-lugaresi/message-cannon/rabbit"
 	"github.com/leandro-lugaresi/message-cannon/subscriber"
 	"github.com/leandro-lugaresi/message-cannon/supervisor"
-	"github.com/oklog/run"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -28,54 +27,38 @@ var launchCmd = &cobra.Command{
 	Short: "Launch will start all the consumers from the config file",
 	Long:  `Launch will start all the consumers from the config file `,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		h := hub.New()
 		err := initConfig()
 		if err != nil {
 			return errors.Wrap(err, "failed initializing the config")
 		}
 
-		factories, err := getFactories(h)
-		log.Print(factories)
-		if err != nil {
-			return err
-		}
-
-		cancelchan := make(chan struct{})
-		var g run.Group
-		g.Add(func() error {
-			return interrupt(cancelchan)
-		}, func(error) {
-			close(cancelchan)
-		})
-
-		logger := subscriber.NewLogSubscriber(
+		h := hub.New()
+		//start the subscribers
+		logger := subscriber.NewLogger(
 			os.Stdout,
 			h.NonBlockingSubscribe(viper.GetInt("log-buffer"), "*.*.*"),
 			viper.GetBool("development"),
 		)
-		g.Add(logger.Do, func(error) {
-			h.Close()
-			logger.Stop()
-		})
+		go logger.Do()
+		defer logger.Stop()
+		defer h.Close()
+
+		factories, err := getFactories(h)
+		if err != nil {
+			return err
+		}
 
 		sup := supervisor.NewManager(viper.GetDuration("interval-checks"), h)
-		g.Add(func() error {
-			err := sup.Start(factories)
-			if err != nil {
-				return err
-			}
-			sup.CheckConsumers(cancelchan)
-			return nil
-		}, func(error) {
-			err := sup.Stop()
-			if err != nil {
-				log.Printf("supervisor failed stopping: %v", err)
-			}
-			close(cancelchan)
-		})
-
-		log.Println("start actors...")
-		return g.Run()
+		err = sup.Start(factories)
+		if err != nil {
+			return err
+		}
+		osSignals := make(chan os.Signal, 1)
+		signal.Notify(osSignals, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+		// Block until a signal is received.
+		s := <-osSignals
+		cmd.Printf("signal %s received. shutting down...", s)
+		return errors.Wrap(sup.Stop(), "error stopping the supervisor")
 	},
 }
 
@@ -128,15 +111,4 @@ func getFactories(h *hub.Hub) ([]supervisor.Factory, error) {
 		factories = append(factories, rFactory)
 	}
 	return factories, nil
-}
-
-func interrupt(cancel <-chan struct{}) error {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-	select {
-	case sig := <-c:
-		return errors.Errorf("received signal %s. shutting down...", sig)
-	case <-cancel:
-		return errors.New("canceled")
-	}
 }

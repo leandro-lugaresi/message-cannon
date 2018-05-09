@@ -133,7 +133,7 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 		return nil, err
 	}
 	f.hub.Publish(hub.Message{
-		Name: "rabbit.declare.info",
+		Name: "rabbit.declare.debug",
 		Body: []byte("setting QoS"),
 		Fields: hub.Fields{
 			"count":    cfg.PrefetchCount,
@@ -148,6 +148,14 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed creating a runner")
 	}
+	f.hub.Publish(hub.Message{
+		Name: "rabbit.declare.debug",
+		Body: []byte("consumer created"),
+		Fields: hub.Fields{
+			"max-workers": cfg.MaxWorkers,
+			"consumer":    name,
+		},
+	})
 	return &consumer{
 		queue:       cfg.Queue.Name,
 		name:        name,
@@ -226,7 +234,7 @@ func (f *Factory) declareQueue(ch *amqp.Channel, queue QueueConfig) error {
 
 	for _, b := range queue.Bindings {
 		f.hub.Publish(hub.Message{
-			Name: "rabbit.declare.info",
+			Name: "rabbit.declare.debug",
 			Body: []byte("declaring queue bind"),
 			Fields: hub.Fields{
 				"queue":    queue.Name,
@@ -250,7 +258,7 @@ func (f *Factory) declareQueue(ch *amqp.Channel, queue QueueConfig) error {
 
 func (f *Factory) declareDeadLetters(ch *amqp.Channel, name string) error {
 	f.hub.Publish(hub.Message{
-		Name:   "rabbit.declare.info",
+		Name:   "rabbit.declare.debug",
 		Body:   []byte("declaring deadletter"),
 		Fields: hub.Fields{"dlx": name},
 	})

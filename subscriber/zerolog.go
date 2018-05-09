@@ -9,17 +9,18 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// LogSubscriber is an actor to handle messages from hub.Subscription
-type LogSubscriber struct {
-	logger zerolog.Logger
-	sub    hub.Subscription
-	done   chan struct{}
+// Logger is wrapper around the zerolog.Logger with
+// the ability to handle messages from hub.Subscription
+type Logger struct {
+	zerolog.Logger
+	sub  hub.Subscription
+	done chan struct{}
 }
 
 // Do will start consuming messages from the subscriber and stop when the Subscription is closed
-func (s *LogSubscriber) Do() error {
-	for msg := range s.sub.Receiver {
-		event := s.logger.WithLevel(getLevel(msg.Name))
+func (l *Logger) Do() {
+	for msg := range l.sub.Receiver {
+		event := l.WithLevel(getLevel(msg.Name))
 		for k, v := range msg.Fields {
 			switch val := v.(type) {
 			case string:
@@ -51,32 +52,36 @@ func (s *LogSubscriber) Do() error {
 		}
 		event.Msg(string(msg.Body))
 	}
-	close(s.done)
-	return nil
+	close(l.done)
 }
 
 // Stop close any open file and clean stuffs
-func (s *LogSubscriber) Stop() {
-	<-s.done
+func (l *Logger) Stop() {
+	<-l.done
 }
 
 func getLevel(topic string) zerolog.Level {
 	switch {
+	case strings.HasSuffix(topic, ".info"):
+		return zerolog.InfoLevel
 	case strings.HasSuffix(topic, ".error"):
 		return zerolog.ErrorLevel
 	case strings.HasSuffix(topic, ".warning"):
 		return zerolog.WarnLevel
 	}
-	return zerolog.InfoLevel
+	return zerolog.DebugLevel
 }
 
-// NewLogSubscriber create an LogSubscriber.
-func NewLogSubscriber(w io.Writer, sub hub.Subscription, development bool) *LogSubscriber {
+// NewLogger create an Logger.
+func NewLogger(w io.Writer, sub hub.Subscription, development bool) *Logger {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	if development {
 		w = zerolog.ConsoleWriter{Out: w}
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
-	return &LogSubscriber{
-		logger: zerolog.New(w).With().Timestamp().Logger(),
+
+	return &Logger{
+		Logger: zerolog.New(w).With().Timestamp().Logger(),
 		sub:    sub,
 		done:   make(chan struct{}),
 	}
