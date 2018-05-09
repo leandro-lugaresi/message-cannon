@@ -121,7 +121,7 @@ func (c *consumer) processMessage(ctx context.Context, msg amqp.Delivery) {
 	var err error
 	start := time.Now()
 	status, err := c.runner.Process(ctx, runner.Message{Body: msg.Body, Headers: getHeaders(msg)})
-	duration := time.Now().Sub(start)
+	duration := time.Since(start)
 	fields := hub.Fields{
 		"duration":    duration,
 		"status-code": status,

@@ -22,11 +22,10 @@ func NewManager(intervalChecks time.Duration, hub *hub.Hub) *Manager {
 		checkAliveness: intervalChecks,
 		ops:            make(chan func(map[string]Factory, map[string]Consumer)),
 	}
-	go m.work()
-	go m.checkConsumers()
 	return m
 }
 
+// work will execute all te operations received from the internal operation channel
 func (m *Manager) work() {
 	factories := make(map[string]Factory)
 	consumers := make(map[string]Consumer)
@@ -86,50 +85,58 @@ func (m *Manager) Stop() error {
 	return nil
 }
 
-func (m *Manager) checkConsumers() {
+// CheckConsumers will tick and send operations to do some checks
+func (m *Manager) CheckConsumers(cancel <-chan struct{}) {
 	tick := time.Tick(m.checkAliveness)
-	for range tick {
-		m.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
-			for name, c := range consumers {
-				if !c.Alive() {
-					m.hub.Publish(hub.Message{
-						Name: "supervisor.recreating_consumer.info",
-						Body: []byte("Recreating one consumer"),
-						Fields: hub.Fields{
-							"factory-name":  c.FactoryName(),
-							"consumer-name": name,
-						},
-					})
-					delete(consumers, name)
-					f, ok := factories[c.FactoryName()]
-					if !ok {
-						m.hub.Publish(hub.Message{
-							Name: "supervisor.recreating_consumer.warning",
-							Body: []byte("Factory did not exist anymore"),
-							Fields: hub.Fields{
-								"factory-name":  c.FactoryName(),
-								"consumer-name": name,
-							},
-						})
-						continue
-					}
-					nc, err := f.CreateConsumer(name)
-					if err != nil {
-						m.hub.Publish(hub.Message{
-							Name: "supervisor.recreating_consumer.error",
-							Body: []byte("Error recreating one consumer"),
-							Fields: hub.Fields{
-								"factory-name":  c.FactoryName(),
-								"consumer-name": name,
-								"error":         err,
-							},
-						})
-						continue
-					}
-					consumers[name] = nc
-					nc.Run()
-				}
+	for {
+		select {
+		case <-tick:
+			m.ops <- m.restartDeadConsumers
+		case <-cancel:
+			return
+		}
+	}
+}
+
+func (m *Manager) restartDeadConsumers(factories map[string]Factory, consumers map[string]Consumer) {
+	for name, c := range consumers {
+		if !c.Alive() {
+			m.hub.Publish(hub.Message{
+				Name: "supervisor.recreating_consumer.info",
+				Body: []byte("Recreating one consumer"),
+				Fields: hub.Fields{
+					"factory-name":  c.FactoryName(),
+					"consumer-name": name,
+				},
+			})
+			delete(consumers, name)
+			f, ok := factories[c.FactoryName()]
+			if !ok {
+				m.hub.Publish(hub.Message{
+					Name: "supervisor.recreating_consumer.warning",
+					Body: []byte("Factory did not exist anymore"),
+					Fields: hub.Fields{
+						"factory-name":  c.FactoryName(),
+						"consumer-name": name,
+					},
+				})
+				continue
 			}
+			nc, err := f.CreateConsumer(name)
+			if err != nil {
+				m.hub.Publish(hub.Message{
+					Name: "supervisor.recreating_consumer.error",
+					Body: []byte("Error recreating one consumer"),
+					Fields: hub.Fields{
+						"factory-name":  c.FactoryName(),
+						"consumer-name": name,
+						"error":         err,
+					},
+				})
+				continue
+			}
+			consumers[name] = nc
+			nc.Run()
 		}
 	}
 }

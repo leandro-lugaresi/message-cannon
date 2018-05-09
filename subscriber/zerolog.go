@@ -1,4 +1,4 @@
-package event
+package subscriber
 
 import (
 	"io"
@@ -13,6 +13,7 @@ import (
 type LogSubscriber struct {
 	logger zerolog.Logger
 	sub    hub.Subscription
+	done   chan struct{}
 }
 
 // Do will start consuming messages from the subscriber and stop when the Subscription is closed
@@ -50,12 +51,13 @@ func (s *LogSubscriber) Do() error {
 		}
 		event.Msg(string(msg.Body))
 	}
+	close(s.done)
 	return nil
 }
 
 // Stop close any open file and clean stuffs
-func (s *LogSubscriber) Stop() error {
-	return nil
+func (s *LogSubscriber) Stop() {
+	<-s.done
 }
 
 func getLevel(topic string) zerolog.Level {
@@ -66,7 +68,6 @@ func getLevel(topic string) zerolog.Level {
 		return zerolog.WarnLevel
 	}
 	return zerolog.InfoLevel
-
 }
 
 // NewLogSubscriber create an LogSubscriber.
@@ -77,5 +78,6 @@ func NewLogSubscriber(w io.Writer, sub hub.Subscription, development bool) *LogS
 	return &LogSubscriber{
 		logger: zerolog.New(w).With().Timestamp().Logger(),
 		sub:    sub,
+		done:   make(chan struct{}),
 	}
 }

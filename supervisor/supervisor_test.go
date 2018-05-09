@@ -16,6 +16,7 @@ func TestManager(t *testing.T) {
 		newStubFactory("NATS", 3),
 	}
 	manager := NewManager(time.Duration(50*time.Millisecond), hub.New())
+	go manager.CheckConsumers(make(chan struct{}))
 	t.Run("Should start all consumers from factories", func(t *testing.T) {
 		err := manager.Start(factories)
 		assert.NoError(t, err, "Start should not return an error")

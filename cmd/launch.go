@@ -13,6 +13,7 @@ import (
 	"github.com/a8m/envsubst"
 	"github.com/leandro-lugaresi/hub"
 	"github.com/leandro-lugaresi/message-cannon/rabbit"
+	"github.com/leandro-lugaresi/message-cannon/subscriber"
 	"github.com/leandro-lugaresi/message-cannon/supervisor"
 	"github.com/oklog/run"
 	"github.com/pkg/errors"
@@ -34,6 +35,7 @@ var launchCmd = &cobra.Command{
 		}
 
 		factories, err := getFactories(h)
+		log.Print(factories)
 		if err != nil {
 			return err
 		}
@@ -46,14 +48,30 @@ var launchCmd = &cobra.Command{
 			close(cancelchan)
 		})
 
+		logger := subscriber.NewLogSubscriber(
+			os.Stdout,
+			h.NonBlockingSubscribe(viper.GetInt("log-buffer"), "*.*.*"),
+			viper.GetBool("development"),
+		)
+		g.Add(logger.Do, func(error) {
+			h.Close()
+			logger.Stop()
+		})
+
 		sup := supervisor.NewManager(viper.GetDuration("interval-checks"), h)
 		g.Add(func() error {
-			return sup.Start(factories)
+			err := sup.Start(factories)
+			if err != nil {
+				return err
+			}
+			sup.CheckConsumers(cancelchan)
+			return nil
 		}, func(error) {
 			err := sup.Stop()
 			if err != nil {
-				log.Printf("failed to stop the supervisor: %v", err)
+				log.Printf("supervisor failed stopping: %v", err)
 			}
+			close(cancelchan)
 		})
 
 		log.Println("start actors...")
@@ -74,8 +92,8 @@ func init() {
 		log.Fatal(err)
 	}
 
-	launchCmd.Flags().IntP("event-buffer", "b", 300, "this flag set the buffer size of the log and metrics systems")
-	err = viper.BindPFlag("event-buffer", launchCmd.Flags().Lookup("event-buffer"))
+	launchCmd.Flags().IntP("log-buffer", "b", 300, "this flag set the buffer size of the log and metrics systems")
+	err = viper.BindPFlag("log-buffer", launchCmd.Flags().Lookup("log-buffer"))
 	if err != nil {
 		log.Fatal(err)
 	}
