@@ -158,7 +158,7 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 		t:           tomb.Tomb{},
 		runner:      runner,
 		hub:         f.hub.With(hub.Fields{"consumer": name}),
-		throttle:    make(chan struct{}, cfg.Workers),
+		workerPool:  make(pool, cfg.MaxWorkers),
 		timeout:     cfg.Runner.Timeout,
 	}, nil
 }

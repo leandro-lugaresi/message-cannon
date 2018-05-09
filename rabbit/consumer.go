@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"strconv"
-	"sync"
 	"time"
 
 	"gopkg.in/tomb.v2"
@@ -19,7 +18,7 @@ type consumer struct {
 	hash        string
 	name        string
 	queue       string
-	throttle    chan struct{}
+	workerPool  pool
 	timeout     time.Duration
 	factoryName string
 	opts        Options
@@ -59,11 +58,11 @@ func (c *consumer) Run() {
 		closed := c.channel.NotifyClose(make(chan *amqp.Error))
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		var wg sync.WaitGroup
 		for {
 			select {
 			case <-dying:
-				wg.Wait()
+				// When dying we wait for any remaining worker to finish
+				c.workerPool.Wait()
 				return nil
 			case err := <-closed:
 				return err
@@ -76,8 +75,9 @@ func (c *consumer) Run() {
 					})
 					return errors.New("receive an empty delivery")
 				}
-				c.throttle <- struct{}{}
-				wg.Add(1)
+				// When maxWorkers goroutines are in flight, Acquire blocks until one of the
+				// workers finishes.
+				c.workerPool.Acquire()
 				go func(msg amqp.Delivery) {
 					nctx := ctx
 					if c.timeout >= time.Second {
@@ -86,8 +86,7 @@ func (c *consumer) Run() {
 						defer canc()
 					}
 					c.processMessage(nctx, msg)
-					<-c.throttle
-					wg.Done()
+					c.workerPool.Release()
 				}(msg)
 			}
 		}
