@@ -2,67 +2,68 @@ package runner
 
 import (
 	"context"
-	"io/ioutil"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/leandro-lugaresi/hub"
 	"github.com/stretchr/testify/require"
-
-	"github.com/leandro-lugaresi/message-cannon/event"
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_command_Process(t *testing.T) {
-	type args struct {
-		b       []byte
-		timeout bool
-	}
+	type (
+		args struct {
+			b       []byte
+			timeout bool
+		}
+		wants struct {
+			exitCode int
+			err      string
+		}
+	)
 	tests := []struct {
-		name       string
-		args       args
-		want       int
-		logEntries []string
+		name  string
+		args  args
+		wants wants
 	}{
 		{
 			"Command with success",
 			args{[]byte(`{"exitcode": 0, "delay": 100000, "info": "this is fine :)"}`), false},
-			0,
-			[]string{`"output":"this is fine :)"`},
+			wants{
+				ExitACK,
+				"",
+			},
 		},
 		{
 			"Command with exit 1",
 			args{[]byte(`{"exitcode": 1, "delay": 100000, "error": "Something is wrong :o"}`), false},
-			1,
-			[]string{`"level":"error","error":"exit status 1","output":"Something is wrong :o","message":"receive an error from command"}`},
+			wants{
+				ExitFailed,
+				"exit status 1",
+			},
 		},
 		{
 			"Command with php exception",
 			args{[]byte(`{"delay": 2000000, "exception": "Something is wrong :o"}`), false},
-			255,
-			[]string{
-				`"level":"error","error":"exit status 255","output":"PHP Fatal error:`,
-				`"message":"receive an error from command"`,
+			wants{
+				255,
+				"exit status 255",
 			},
 		},
 		{
 			"Command with timeout",
 			args{[]byte(`{"exitcode": 0,"delay": 2000000}`), true},
-			-1,
-			[]string{
-				`"level":"error","error":"signal: killed","output":"","message":"receive an error from command"`,
+			wants{
+				-1,
+				"signal: killed",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, w, err := os.Pipe()
-			require.NoError(t, err, "Fail creating the pipe file")
-			logger := event.NewLogger(event.NewZeroLogHandler(w, false), 30)
 			c := &command{
 				cmd:  "testdata/receive.php",
 				args: []string{},
-				log:  logger,
+				hub:  hub.New(),
 			}
 			ctx := context.Background()
 			if tt.args.timeout {
@@ -70,19 +71,13 @@ func Test_command_Process(t *testing.T) {
 				ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
 				defer cancel()
 			}
-			if got := c.Process(ctx, tt.args.b, map[string]string{}); got != tt.want {
-				t.Errorf("command.Process() = %v, want %v", got, tt.want)
+			exitCode, err := c.Process(ctx, Message{Body: tt.args.b, Headers: map[string]string{}})
+			if len(tt.wants.err) > 0 {
+				require.Contains(t, err.Error(), tt.wants.err)
+			} else {
+				require.NoError(t, err)
 			}
-			logger.Close()
-
-			err = w.Close()
-			if err != nil {
-				t.Fatal(err, "failed to close the pipe writer")
-			}
-			out, _ := ioutil.ReadAll(r)
-			for _, entry := range tt.logEntries {
-				assert.Contains(t, string(out), entry, "")
-			}
+			require.Equal(t, tt.wants.exitCode, exitCode, "command.Process wrong return value")
 		})
 	}
 }

@@ -8,51 +8,57 @@ import (
 
 	"os/exec"
 
-	"github.com/leandro-lugaresi/message-cannon/event"
+	"github.com/leandro-lugaresi/hub"
 	"github.com/pkg/errors"
 )
 
 type command struct {
-	cmd          string
-	args         []string
-	log          *event.Logger
-	ignoreOutput bool
+	cmd  string
+	args []string
+	hub  *hub.Hub
 }
 
-func (c *command) Process(ctx context.Context, b []byte, headers map[string]string) int {
+func (c *command) Process(ctx context.Context, msg Message) (int, error) {
 	cmd := exec.CommandContext(ctx, c.cmd, c.args...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		c.log.Error("receive an error creating the stdin pipe", event.KV("error", err))
+		return ExitNACKRequeue, errors.Wrap(err, "open pipe to stdin failed")
 	}
 	go func() {
-		_, pipeErr := stdin.Write(b)
+		_, pipeErr := stdin.Write(msg.Body)
 		if pipeErr != nil {
-			c.log.Error("failed writing to stdin", event.KV("error", pipeErr))
+			c.hub.Publish(hub.Message{
+				Name:   "system.log.error",
+				Body:   []byte("failed writing to stdin"),
+				Fields: hub.Fields{"error": pipeErr},
+			})
 		}
 		pipeErr = stdin.Close()
 		if pipeErr != nil {
-			c.log.Error("failed closing stdin", event.KV("error", pipeErr))
+			c.hub.Publish(hub.Message{
+				Name:   "system.log.error",
+				Body:   []byte("close stdin failed"),
+				Fields: hub.Fields{"error": pipeErr},
+			})
 		}
 	}()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		c.log.Error("receive an error from command", event.KV("error", err), event.KV("output", output))
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-				return status.ExitStatus()
+				return status.ExitStatus(), &Error{
+					Err:        exiterr,
+					Output:     output,
+					StatusCode: status.ExitStatus(),
+				}
 			}
 		}
-
-		return ExitFailed
+		return ExitNACKRequeue, err
 	}
-	if !c.ignoreOutput && len(output) > 0 {
-		c.log.Info("message processed with output", event.KV("output", output))
-	}
-	return ExitACK
+	return ExitACK, nil
 }
 
-func newCommand(log *event.Logger, c Config) (*command, error) {
+func newCommand(c Config, h *hub.Hub) (*command, error) {
 	if split := strings.Split(c.Options.Path, " "); len(split) > 1 {
 		c.Options.Path = split[0]
 		c.Options.Args = append(split[1:], c.Options.Args...)
@@ -61,10 +67,9 @@ func newCommand(log *event.Logger, c Config) (*command, error) {
 		return nil, errors.Errorf("The command %s didn't exist", c.Options.Path)
 	}
 	cmd := command{
-		cmd:          c.Options.Path,
-		args:         c.Options.Args,
-		log:          log,
-		ignoreOutput: c.IgnoreOutput,
+		cmd:  c.Options.Path,
+		args: c.Options.Args,
+		hub:  h,
 	}
 	return &cmd, nil
 }

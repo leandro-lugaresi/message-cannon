@@ -9,78 +9,106 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/leandro-lugaresi/message-cannon/event"
+	"github.com/leandro-lugaresi/hub"
+	"github.com/pkg/errors"
 )
 
 type httpRunner struct {
 	client       *http.Client
 	ignoreOutput bool
-	log          *event.Logger
+	hub          *hub.Hub
 	url          string
 	headers      map[string]string
 	returnOn5xx  int
 }
 
-func (p *httpRunner) Process(ctx context.Context, b []byte, headers map[string]string) int {
-	contentReader := bytes.NewReader(b)
-	req, err := http.NewRequest("POST", p.url, contentReader)
+func (p *httpRunner) Process(ctx context.Context, msg Message) (int, error) {
+	req, err := p.prepareRequest(msg)
 	if err != nil {
-		p.log.Error("error creating the request", event.KV("error", err))
-		return ExitRetry
+		return ExitNACKRequeue, errors.Wrap(err, "request creation failed")
 	}
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
-	for k, v := range p.headers {
-		req.Header.Set(k, v)
-	}
-	resp, err := p.client.Do(req)
+	resp, body, err := p.executeRequest(req)
 	if err != nil {
-		p.log.Error("failed doing the request", event.KV("error", err))
-		return ExitRetry
-	}
-	defer func() {
-		deferErr := resp.Body.Close()
-		if deferErr != nil {
-			p.log.Error("error closing the response body", event.KV("error", deferErr))
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			return ExitTimeout, &Error{Err: netErr, StatusCode: -1}
 		}
-	}()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		p.log.Error("error reading the response body", event.KV("error", err))
+		return ExitNACKRequeue, errors.Wrap(err, "failed doing the request")
 	}
 	if resp.StatusCode >= 500 {
-		p.log.Error("receive an 5xx error from request",
-			event.KV("status-code", resp.StatusCode),
-			event.KV("output", body))
-		return p.returnOn5xx
+		return p.returnOn5xx, &Error{
+			Err:        errors.New("receive an 5xx error from request"),
+			StatusCode: resp.StatusCode,
+			Output:     body,
+		}
 	}
 	if resp.StatusCode >= 400 {
-		p.log.Error("receive an 4xx error from request",
-			event.KV("status-code", resp.StatusCode),
-			event.KV("output", body))
-		return ExitRetry
+		return ExitNACKRequeue, &Error{
+			Err:        errors.New("receive an 4xx error from request"),
+			StatusCode: resp.StatusCode,
+			Output:     body,
+		}
 	}
 	if p.ignoreOutput {
-		return ExitACK
+		return ExitACK, nil
 	}
 	content := struct {
 		ResponseCode int `json:"response-code"`
 	}{}
 	err = json.Unmarshal(body, &content)
 	if err != nil && len(body) > 0 {
-		p.log.Error("failed to unmarshal the response",
-			event.KV("error", err),
-			event.KV("status-code", resp.StatusCode),
-			event.KV("output", body))
-		return ExitNACKRequeue
+		return ExitNACKRequeue, &Error{
+			Err:        err,
+			StatusCode: resp.StatusCode,
+			Output:     body,
+		}
 	}
-	return content.ResponseCode
+	return content.ResponseCode, nil
 }
 
-func newHTTP(log *event.Logger, c Config) (*httpRunner, error) {
+func (p *httpRunner) prepareRequest(msg Message) (*http.Request, error) {
+	contentReader := bytes.NewReader(msg.Body)
+	req, err := http.NewRequest("POST", p.url, contentReader)
+	if err != nil {
+		return req, err
+	}
+	for k, v := range msg.Headers {
+		req.Header.Set(k, v)
+	}
+	for k, v := range p.headers {
+		req.Header.Set(k, v)
+	}
+	return req, nil
+}
+
+func (p *httpRunner) executeRequest(req *http.Request) (*http.Response, []byte, error) {
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return resp, []byte{}, err
+	}
+	defer func() {
+		deferErr := resp.Body.Close()
+		if deferErr != nil {
+			p.hub.Publish(hub.Message{
+				Name:   "system.log.error",
+				Body:   []byte("error closing the response body"),
+				Fields: hub.Fields{"error": deferErr},
+			})
+		}
+	}()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		p.hub.Publish(hub.Message{
+			Name:   "system.log.error",
+			Body:   []byte("error reading the response body"),
+			Fields: hub.Fields{"error": err},
+		})
+	}
+	return resp, body, nil
+}
+
+func newHTTP(c Config, h *hub.Hub) (*httpRunner, error) {
 	runner := httpRunner{
-		log:          log,
+		hub:          h,
 		url:          c.Options.URL,
 		ignoreOutput: c.IgnoreOutput,
 		headers:      c.Options.Headers,

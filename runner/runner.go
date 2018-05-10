@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leandro-lugaresi/message-cannon/event"
+	"github.com/leandro-lugaresi/hub"
 	"github.com/pkg/errors"
 	"gopkg.in/mcuadros/go-defaults.v1"
 )
@@ -21,43 +21,62 @@ const (
 	ExitRetry       = 5
 )
 
-// Runnable represent an runnable used by consumers to handle messages.
-type Runnable interface {
-	Process(context.Context, []byte, map[string]string) int
-}
+type (
+	// Runnable represent an runnable used by consumers to handle messages.
+	Runnable interface {
+		Process(context.Context, Message) (int, error)
+	}
 
-// Options is a composition os all options used internally by runners.
-// options not needed by one runner will be ignored.
-type Options struct {
-	// Command options
-	Path string   `mapstructure:"path"`
-	Args []string `mapstructure:"args"`
-	// HTTP options
-	URL         string `mapstructure:"url"`
-	ReturnOn5xx int    `mapstructure:"return-on-5xx" default:"4"`
-	Headers     map[string]string
-}
+	// Message is an container struct with general fields used by messages.
+	Message struct {
+		Body    []byte
+		Headers map[string]string
+	}
 
-// Config is an composition of options and configurations used by this runnables.
-type Config struct {
-	Type         string        `mapstructure:"type"`
-	IgnoreOutput bool          `mapstructure:"ignore-output"`
-	Options      Options       `mapstructure:"options"`
-	Timeout      time.Duration `mapstructure:"timeout"`
-}
+	// Options is a composition os all options used internally by runners.
+	// options not needed by one runner will be ignored.
+	Options struct {
+		// Command options
+		Path string   `mapstructure:"path"`
+		Args []string `mapstructure:"args"`
+		// HTTP options
+		URL         string `mapstructure:"url"`
+		ReturnOn5xx int    `mapstructure:"return-on-5xx" default:"4"`
+		Headers     map[string]string
+	}
+
+	// Config is an composition of options and configurations used by this runnables.
+	Config struct {
+		Type         string        `mapstructure:"type"`
+		IgnoreOutput bool          `mapstructure:"ignore-output"`
+		Options      Options       `mapstructure:"options"`
+		Timeout      time.Duration `mapstructure:"timeout"`
+	}
+
+	// Error describes an error during the Process phase.
+	Error struct {
+		Err        error
+		StatusCode int
+		Output     []byte
+	}
+)
 
 // New create and return a Runnable based on the config type. if the type didn't exist an error is returned.
-func New(log *event.Logger, c Config) (Runnable, error) {
+func New(c Config, h *hub.Hub) (Runnable, error) {
 	defaults.SetDefaults(&c)
 	defaults.SetDefaults(&c.Options)
 	switch c.Type {
 	case "command":
-		return newCommand(log, c)
+		return newCommand(c, h)
 	case "http":
-		return newHTTP(log, c)
+		return newHTTP(c, h)
 	}
 	return nil, errors.Errorf(
-		"Invalid Runner type (\"%s\") expecting (%s)",
+		"Invalid Runner type (\"%s\") expecting one of (%s)",
 		c.Type,
-		strings.Join([]string{"command"}, ", "))
+		strings.Join([]string{"command", "http"}, ", "))
+}
+
+func (e *Error) Error() string {
+	return e.Err.Error()
 }

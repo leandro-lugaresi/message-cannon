@@ -14,10 +14,6 @@ type Factory interface {
 
 // Consumer consume messages and pass to workers who will process the messages.
 type Consumer interface {
-	// TODO: Create the state, we will add some metrics here
-	// State returns a copy of the executor's current operation state.
-	// State() State
-
 	// Run will get the messages and pass to the runner.
 	Run()
 
