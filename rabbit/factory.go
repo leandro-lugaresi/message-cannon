@@ -84,43 +84,9 @@ func (f *Factory) Name() string {
 
 func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error) {
 	defaults.SetDefaults(&cfg)
-	_, ok := f.conns[cfg.Connection]
-	if !ok {
-		available := []string{}
-		for connName := range f.conns {
-			available = append(available, connName)
-		}
-		return nil, errors.Errorf(
-			"connection name for consumer(%s) did not exist, connections names available: %s",
-			name,
-			strings.Join(available, ", "))
-	}
-
-	var ch *amqp.Channel
-	var errCH error
-	conn := f.conns[cfg.Connection]
-	ch, errCH = conn.Channel()
-	// Reconnect the connection when receive an connection closed error
-	if errCH != nil && errCH.Error() == amqp.ErrClosed.Error() {
-		cfgConn := f.config.Connections[cfg.Connection]
-		f.hub.Publish(hub.Message{
-			Name: "rabbit.reopening_connection.info",
-			Body: []byte("reopening one connection closed"),
-			Fields: hub.Fields{
-				"sleep":      cfgConn.Sleep,
-				"timeout":    cfgConn.Timeout,
-				"connection": cfg.Connection,
-			},
-		})
-		conn, err := openConnection(cfgConn.DSN, 5, cfgConn.Sleep, cfgConn.Timeout)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error reopening the connection \"%s\"", cfg.Connection)
-		}
-		f.conns[cfg.Connection] = conn
-		ch, errCH = conn.Channel()
-	}
-	if errCH != nil {
-		return nil, errors.Wrap(errCH, "failed to open the rabbitMQ channel")
+	ch, err := f.getChannel(cfg.Connection)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open the rabbitMQ channel for consumer %s", name)
 	}
 	if len(cfg.DeadLetter) > 0 {
 		err := f.declareDeadLetters(ch, cfg.DeadLetter)
@@ -128,7 +94,7 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 			return nil, err
 		}
 	}
-	err := f.declareQueue(ch, cfg.Queue)
+	err = f.declareQueue(ch, cfg.Queue)
 	if err != nil {
 		return nil, err
 	}
@@ -273,6 +239,45 @@ func (f *Factory) declareDeadLetters(ch *amqp.Channel, name string) error {
 	}
 	err := f.declareQueue(ch, dead.Queue)
 	return errors.Wrapf(err, "failed to declare the queue for deadletter %s", name)
+}
+
+func (f *Factory) getChannel(connectionName string) (*amqp.Channel, error) {
+	_, ok := f.conns[connectionName]
+	if !ok {
+		available := []string{}
+		for name := range f.conns {
+			available = append(available, name)
+		}
+		return nil, errors.Errorf(
+			"connection (%s) did not exist, connections names available: %s",
+			connectionName,
+			strings.Join(available, ", "))
+	}
+
+	var ch *amqp.Channel
+	var errCH error
+	conn := f.conns[connectionName]
+	ch, errCH = conn.Channel()
+	// Reconnect the connection when receive an connection closed error
+	if errCH != nil && errCH.Error() == amqp.ErrClosed.Error() {
+		cfgConn := f.config.Connections[connectionName]
+		f.hub.Publish(hub.Message{
+			Name: "rabbit.reopening_connection.info",
+			Body: []byte("reopening one connection closed"),
+			Fields: hub.Fields{
+				"sleep":      cfgConn.Sleep,
+				"timeout":    cfgConn.Timeout,
+				"connection": connectionName,
+			},
+		})
+		conn, err := openConnection(cfgConn.DSN, 5, cfgConn.Sleep, cfgConn.Timeout)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error reopening the connection \"%s\"", connectionName)
+		}
+		f.conns[connectionName] = conn
+		ch, errCH = conn.Channel()
+	}
+	return ch, errCH
 }
 
 func openConnection(dsn string, retries int, sleep, timeout time.Duration) (*amqp.Connection, error) {
