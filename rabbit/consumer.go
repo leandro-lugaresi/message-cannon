@@ -27,7 +27,7 @@ type consumer struct {
 	hub         *hub.Hub
 }
 
-// Run will get the messages and pass to the runner.
+// Run start a goroutine to consume messages and pass to one runner.
 func (c *consumer) Run() {
 	c.t.Go(func() error {
 		defer func() {
