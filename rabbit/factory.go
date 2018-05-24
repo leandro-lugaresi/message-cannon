@@ -89,7 +89,7 @@ func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error
 		return nil, errors.Wrapf(err, "failed to open the rabbitMQ channel for consumer %s", name)
 	}
 	if len(cfg.DeadLetter) > 0 {
-		err := f.declareDeadLetters(ch, cfg.DeadLetter)
+		err = f.declareDeadLetters(ch, cfg.DeadLetter)
 		if err != nil {
 			return nil, err
 		}
