@@ -24,23 +24,23 @@ import (
 func TestIntegrationSuite(t *testing.T) {
 	tests := []struct {
 		scenario string
-		function func(*testing.T, *dockertest.Resource)
+		method   func(*testing.T, *dockertest.Resource)
 	}{
 		{
 			scenario: "validate the behavior when we have connection trouble",
-			function: testFactoryShouldReturnConnectionErrors,
+			method:   testFactoryShouldReturnConnectionErrors,
 		},
 		{
 			scenario: "validate a factory with two connections",
-			function: testFactoryWithTwoConnections,
+			method:   testFactoryWithTwoConnections,
 		},
 		{
 			scenario: "validate the behavior of one healthy consumer",
-			function: testConsumerProcess,
+			method:   testConsumerProcess,
 		},
 		{
 			scenario: "validate that all the consumers will restart without problems",
-			function: testConsumerReconnect,
+			method:   testConsumerReconnect,
 		},
 	}
 	// -> Setup
@@ -57,7 +57,7 @@ func TestIntegrationSuite(t *testing.T) {
 	// -> Run!
 	for _, test := range tests {
 		t.Run(test.scenario, func(st *testing.T) {
-			test.function(st, resource)
+			test.method(st, resource)
 		})
 	}
 }
