@@ -66,8 +66,8 @@ func (c *consumer) Run() {
 				return nil
 			case err := <-closed:
 				return err
-			case msg := <-d:
-				if msg.Acknowledger == nil {
+			case msg, ok := <-d:
+				if !ok {
 					c.hub.Publish(hub.Message{
 						Name:   "rabbit.consumer.error",
 						Body:   []byte("receive an empty delivery. closing consumer"),
