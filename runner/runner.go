@@ -7,7 +7,6 @@ import (
 
 	"github.com/leandro-lugaresi/hub"
 	"github.com/pkg/errors"
-	"gopkg.in/mcuadros/go-defaults.v1"
 )
 
 // Exit constants used to know how handle the message.
@@ -40,9 +39,9 @@ type (
 		Path string   `mapstructure:"path"`
 		Args []string `mapstructure:"args"`
 		// HTTP options
-		URL         string `mapstructure:"url"`
-		ReturnOn5xx int    `mapstructure:"return-on-5xx" default:"4"`
-		Headers     map[string]string
+		URL         string            `mapstructure:"url"`
+		ReturnOn5xx int               `mapstructure:"return-on-5xx" default:"4"`
+		Headers     map[string]string `mapstructure:"headers" default:"{}"`
 	}
 
 	// Config is an composition of options and configurations used by this runnables.
@@ -63,8 +62,6 @@ type (
 
 // New create and return a Runnable based on the config type. if the type didn't exist an error is returned.
 func New(c Config, h *hub.Hub) (Runnable, error) {
-	defaults.SetDefaults(&c)
-	defaults.SetDefaults(&c.Options)
 	switch c.Type {
 	case "command":
 		return newCommand(c, h)

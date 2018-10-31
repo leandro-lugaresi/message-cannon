@@ -64,26 +64,3 @@ func TestNew(t *testing.T) {
 		})
 	}
 }
-
-func TestRunShoudSetDefaults(t *testing.T) {
-	t.Run("with empty values", func(t *testing.T) {
-		got, err := New(Config{
-			Type: "http",
-		}, hub.New())
-		assert.NoError(t, err)
-		httpRunner := got.(*httpRunner)
-		assert.Equal(t, false, httpRunner.ignoreOutput)
-		assert.Equal(t, 4, httpRunner.returnOn5xx)
-	})
-	t.Run("using ack integer should overide to default", func(t *testing.T) {
-		got, err := New(Config{
-			Type: "http",
-			Options: Options{
-				ReturnOn5xx: ExitACK,
-			},
-		}, hub.New())
-		assert.NoError(t, err)
-		httpRunner := got.(*httpRunner)
-		assert.Equal(t, 4, httpRunner.returnOn5xx)
-	})
-}
