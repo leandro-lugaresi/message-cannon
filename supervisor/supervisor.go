@@ -107,7 +107,6 @@ func (m *Manager) restartDeadConsumers(factories map[string]Factory, consumers m
 					"consumer-name": name,
 				},
 			})
-			delete(consumers, name)
 			f, ok := factories[c.FactoryName()]
 			if !ok {
 				m.hub.Publish(hub.Message{
@@ -133,6 +132,7 @@ func (m *Manager) restartDeadConsumers(factories map[string]Factory, consumers m
 				})
 				continue
 			}
+			delete(consumers, name)
 			consumers[name] = nc
 			nc.Run()
 		}
