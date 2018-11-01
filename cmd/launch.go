@@ -18,7 +18,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	defaults "gopkg.in/mcuadros/go-defaults.v1"
 )
 
 // launchCmd represents the launch command
@@ -99,10 +98,10 @@ func getFactories(h *hub.Hub) ([]supervisor.Factory, error) {
 	if viper.InConfig("rabbitmq") {
 		config := rabbit.Config{}
 		err := viper.UnmarshalKey("rabbitmq", &config)
-		defaults.SetDefaults(&config)
 		if err != nil {
 			return factories, errors.Wrap(err, "problem unmarshaling your config into config struct")
 		}
+		config.Version = version
 		var rFactory *rabbit.Factory
 		rFactory, err = rabbit.NewFactory(config, h)
 		if err != nil {

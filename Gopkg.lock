@@ -44,6 +44,12 @@
   revision = "c6cef34830231743494fe2969284df7b82cc0ad0"
 
 [[projects]]
+  name = "github.com/creasty/defaults"
+  packages = ["."]
+  revision = "a7e48e2230891fc7456c8ab918c424c5b06c3192"
+  version = "v1.2.1"
+
+[[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
@@ -298,12 +304,6 @@
   version = "v0.3.0"
 
 [[projects]]
-  name = "gopkg.in/mcuadros/go-defaults.v1"
-  packages = ["."]
-  revision = "ac8540f0fc7e0fb5f1eb9e25c6fd0b8db8f97eed"
-  version = "v1.1.0"
-
-[[projects]]
   name = "gopkg.in/ory-am/dockertest.v3"
   packages = ["."]
   revision = "2e92e7784b6fb199fd168aa46269a2f1b34f299e"
@@ -324,6 +324,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "fe7cd9c30f3646c2c5fa7bf9246fadc8c2d3f7e6da77b3972a871507b6dc375a"
+  inputs-digest = "93d2d3e006ed2f1cf02466ae7a71b26a217b8c7442bab69d763d53426b7850fa"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -7,7 +7,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cfgFile string
+var (
+	cfgFile string
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -17,11 +22,8 @@ var RootCmd = &cobra.Command{
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute(version, commit string) {
-	RootCmd.Long = fmt.Sprint(
-		RootCmd.Short,
-		"\n\nVersion: ", version,
-		"\nCommit:", commit)
+func Execute() {
+	RootCmd.Version = fmt.Sprintf("%v, commit %v, built at %v", version, commit, date)
 	if err := RootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

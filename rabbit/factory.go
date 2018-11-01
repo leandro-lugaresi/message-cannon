@@ -5,9 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"time"
 
-	defaults "gopkg.in/mcuadros/go-defaults.v1"
 	"gopkg.in/tomb.v2"
 
 	"github.com/leandro-lugaresi/hub"
@@ -28,9 +26,16 @@ type Factory struct {
 
 // NewFactory will open the initial connections and start the recover connections procedure.
 func NewFactory(config Config, h *hub.Hub) (*Factory, error) {
+	err := setConfigDefaults(&config)
+	if err != nil {
+		h.Publish(hub.Message{
+			Name:   "rabbit.config.warning",
+			Body:   []byte("Failed to set default values for configs"),
+			Fields: hub.Fields{"error": err},
+		})
+	}
 	conns := make(map[string]*amqp.Connection)
 	for name, cfgConn := range config.Connections {
-		defaults.SetDefaults(&cfgConn)
 		h.Publish(hub.Message{
 			Name: "rabbit.opening_connection.info",
 			Body: []byte("opening connection with rabbitMQ"),
@@ -40,7 +45,7 @@ func NewFactory(config Config, h *hub.Hub) (*Factory, error) {
 				"connection": name,
 			},
 		})
-		conn, err := openConnection(cfgConn.DSN, 3, cfgConn.Sleep, cfgConn.Timeout)
+		conn, err := openConnection(cfgConn, config.Version)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error opening the connection \"%s\"", name)
 		}
@@ -83,7 +88,6 @@ func (f *Factory) Name() string {
 }
 
 func (f *Factory) newConsumer(name string, cfg ConsumerConfig) (*consumer, error) {
-	defaults.SetDefaults(&cfg)
 	ch, err := f.getChannel(cfg.Connection)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open the rabbitMQ channel for consumer %s", name)
@@ -270,7 +274,7 @@ func (f *Factory) getChannel(connectionName string) (*amqp.Channel, error) {
 				"connection": connectionName,
 			},
 		})
-		conn, err := openConnection(cfgConn.DSN, 5, cfgConn.Sleep, cfgConn.Timeout)
+		conn, err := openConnection(cfgConn, f.config.Version)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reopening the connection \"%s\"", connectionName)
 		}
@@ -280,17 +284,21 @@ func (f *Factory) getChannel(connectionName string) (*amqp.Channel, error) {
 	return ch, errCH
 }
 
-func openConnection(dsn string, retries int, sleep, timeout time.Duration) (*amqp.Connection, error) {
+func openConnection(config Connection, version string) (*amqp.Connection, error) {
 	var conn *amqp.Connection
 	err := retry.Do(func() error {
 		var err error
-		conn, err = amqp.DialConfig(dsn, amqp.Config{
+		conn, err = amqp.DialConfig(config.DSN, amqp.Config{
 			Dial: func(network, addr string) (net.Conn, error) {
-				return net.DialTimeout(network, addr, timeout)
+				return net.DialTimeout(network, addr, config.Timeout)
+			},
+			Properties: amqp.Table{
+				"product": "message-cannon",
+				"version": version,
 			},
 		})
 		return err
-	}, retries, sleep)
+	}, 5, config.Sleep)
 	return conn, err
 }
 

@@ -203,6 +203,7 @@ func getConfig(t *testing.T, configFile string) Config {
 
 	err = viper.UnmarshalKey("rabbitmq", &c)
 	assert.NoError(t, err, "Failed to marshal the config struct: ")
+	setConfigDefaults(&c)
 	return c
 }
 
