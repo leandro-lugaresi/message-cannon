@@ -14,7 +14,7 @@ builds:
   ldflags:
     - "-s -w -X github.com/leandro-lugaresi/message-cannon/cmd.version={{.Version}}"
     - " -X github.com/leandro-lugaresi/message-cannon/cmd.commit={{.Commit}}"
-    - " -X github.com/leandro-lugaresi/message-cannon/cmd.date={{.Date}"
+    - " -X github.com/leandro-lugaresi/message-cannon/cmd.date={{.Date}}"
 
 archive:
   name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
