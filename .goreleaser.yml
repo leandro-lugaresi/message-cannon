@@ -16,16 +16,33 @@ builds:
     - " -X github.com/leandro-lugaresi/message-cannon/cmd.commit={{.Commit}}"
     - " -X github.com/leandro-lugaresi/message-cannon/cmd.date={{.Date}"
 
-fpm:
+archive:
+  name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+  replacements:
+    darwin: Darwin
+    linux: Linux
+    windows: Windows
+    386: i386
+    amd64: x86_64
+  format_overrides:
+  - goos: windows
+    format: zip
+nfpm:
+  name_template: '{{ .ProjectName }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
   homepage:  https://github.com/leandro-lugaresi/message-cannon
   description: Consume rabbitMQ messages and send to any cli program
   maintainer: Leandro Lugaresi <leandrolugaresi92@gmail.com>
   license: MIT
   vendor: Leandro Lugaresi
   formats:
-    - deb
-    - rpm
+  - deb
+  - rpm
+  dependencies:
+  - git
+  recommends:
+  - rpm
 snapcraft:
+  name_template: '{{ .ProjectName }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
   summary: Consume rabbitMQ messages and send to any cli program
   description: Consume rabbitMQ messages and send to any cli program
   grade: stable
