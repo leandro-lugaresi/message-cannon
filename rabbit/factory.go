@@ -26,7 +26,14 @@ type Factory struct {
 
 // NewFactory will open the initial connections and start the recover connections procedure.
 func NewFactory(config Config, h *hub.Hub) (*Factory, error) {
-	setConfigDefaults(&config)
+	err := setConfigDefaults(&config)
+	if err != nil {
+		h.Publish(hub.Message{
+			Name:   "rabbit.config.warning",
+			Body:   []byte("Failed to set default values for configs"),
+			Fields: hub.Fields{"error": err},
+		})
+	}
 	conns := make(map[string]*amqp.Connection)
 	for name, cfgConn := range config.Connections {
 		h.Publish(hub.Message{

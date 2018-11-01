@@ -90,15 +90,22 @@ type Options struct {
 	Args       amqp.Table `mapstructure:"args" default:"{}"`
 }
 
-func setConfigDefaults(config *Config) {
-	defaults.Set(config)
+func setConfigDefaults(config *Config) error {
+	if err := defaults.Set(config); err != nil {
+		return err
+	}
+
 	for k, cfg := range config.Connections {
-		defaults.Set(&cfg)
+		if err := defaults.Set(&cfg); err != nil {
+			return err
+		}
 		config.Connections[k] = cfg
 	}
 
 	for k, cfg := range config.Consumers {
-		defaults.Set(&cfg)
+		if err := defaults.Set(&cfg); err != nil {
+			return err
+		}
 		if len(cfg.Runner.Options.Headers) == 0 {
 			cfg.Runner.Options.Headers = map[string]string{}
 		}
@@ -110,12 +117,17 @@ func setConfigDefaults(config *Config) {
 	}
 
 	for k, cfg := range config.DeadLetters {
-		defaults.Set(&cfg)
+		if err := defaults.Set(&cfg); err != nil {
+			return err
+		}
 		config.DeadLetters[k] = cfg
 	}
 
 	for k, cfg := range config.Exchanges {
-		defaults.Set(&cfg)
+		if err := defaults.Set(&cfg); err != nil {
+			return err
+		}
 		config.Exchanges[k] = cfg
 	}
+	return nil
 }

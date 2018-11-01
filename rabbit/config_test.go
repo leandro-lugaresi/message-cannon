@@ -28,7 +28,8 @@ func Test_withDefaults(t *testing.T) {
 		Version: "0.0.5",
 	}
 
-	setConfigDefaults(&config)
+	err := setConfigDefaults(&config)
+	require.NoError(t, err)
 	require.Equal(t, 5, config.Connections["de"].Retries)
 	require.Equal(t, 2*time.Second, config.Connections["de"].Timeout)
 	require.Equal(t, 500*time.Millisecond, config.Connections["de"].Sleep)
@@ -37,6 +38,7 @@ func Test_withDefaults(t *testing.T) {
 	require.Equal(t, 4, config.Consumers["consumer1"].Runner.Options.ReturnOn5xx)
 	require.Equal(t, "message-cannon/0.0.5", config.Consumers["consumer1"].Runner.Options.Headers["User-Agent"])
 	config.Consumers["consumer1"].Runner.Options.Headers["User-Agent"] = "UserAgent From Config"
-	setConfigDefaults(&config)
+	err = setConfigDefaults(&config)
+	require.NoError(t, err)
 	require.Equal(t, "UserAgent From Config", config.Consumers["consumer1"].Runner.Options.Headers["User-Agent"])
 }

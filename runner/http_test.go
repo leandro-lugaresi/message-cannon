@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/creasty/defaults"
 	"github.com/leandro-lugaresi/hub"
 	"github.com/stretchr/testify/require"
 )
@@ -174,12 +175,14 @@ func Test_httpRunner_Process(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			runner, err := New(Config{
+			config := Config{
 				IgnoreOutput: tt.ignoreOutput,
 				Type:         "http",
 				Timeout:      1 * time.Second,
 				Options:      Options{URL: "http://localhost:8089"},
-			}, hub.New())
+			}
+			defaults.Set(&config)
+			runner, err := New(config, hub.New())
 			require.NoError(t, err)
 
 			got, err := runner.Process(ctx, Message{Body: tt.args.b, Headers: tt.args.headers})
