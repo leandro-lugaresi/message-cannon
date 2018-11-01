@@ -9,6 +9,13 @@ builds:
   env:
     - CGO_ENABLED=0
 
+  # Custom ldflags templates.
+  # Default is `-s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}`.
+  ldflags:
+    - "-s -w -X github.com/leandro-lugaresi/message-cannon/cmd.version={{.Version}}"
+    - " -X github.com/leandro-lugaresi/message-cannon/cmd.commit={{.Commit}}"
+    - " -X github.com/leandro-lugaresi/message-cannon/cmd.date={{.Date}"
+
 fpm:
   homepage:  https://github.com/leandro-lugaresi/message-cannon
   description: Consume rabbitMQ messages and send to any cli program
@@ -36,12 +43,11 @@ snapcraft:
       # background, you can make it a simple daemon.
       daemon: simple
 dockers:
-  - image: leandrolugaresi/message-cannon
     # Template of the docker tag. Defaults to `{{ .Version }}`. Other allowed
     # fields are `.Tag`, `.Major`, `.Minor` and `.Patch` and
     # `.Env.VARIABLE_NAME`.
-    tag_templates:
-      - "{{ .Version }}"
-      - "v{{ .Major }}"
-      - "v{{ .Major }}.{{ .Minor }}"
-      - latest
+  - image_templates:
+      - "leandrolugaresi/message-cannon:{{ .Version }}"
+      - "leandrolugaresi/message-cannon:v{{ .Major }}"
+      - "leandrolugaresi/message-cannon:v{{ .Major }}.{{ .Minor }}"
+      - "leandrolugaresi/message-cannon:latest"
