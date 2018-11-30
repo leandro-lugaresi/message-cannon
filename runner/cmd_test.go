@@ -59,6 +59,7 @@ func Test_command_Process(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		ctt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			c := &command{
 				cmd:  "testdata/receive.php",
@@ -66,18 +67,18 @@ func Test_command_Process(t *testing.T) {
 				hub:  hub.New(),
 			}
 			ctx := context.Background()
-			if tt.args.timeout {
+			if ctt.args.timeout {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
 				defer cancel()
 			}
-			exitCode, err := c.Process(ctx, Message{Body: tt.args.b, Headers: map[string]string{}})
-			if len(tt.wants.err) > 0 {
-				require.Contains(t, err.Error(), tt.wants.err)
+			exitCode, err := c.Process(ctx, Message{Body: ctt.args.b, Headers: map[string]string{}})
+			if len(ctt.wants.err) > 0 {
+				require.Contains(t, err.Error(), ctt.wants.err)
 			} else {
 				require.NoError(t, err)
 			}
-			require.Equal(t, tt.wants.exitCode, exitCode, "command.Process wrong return value")
+			require.Equal(t, ctt.wants.exitCode, exitCode, "command.Process wrong return value")
 		})
 	}
 }

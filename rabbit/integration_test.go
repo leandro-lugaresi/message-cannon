@@ -56,13 +56,14 @@ func TestIntegrationSuite(t *testing.T) {
 	}()
 	// -> Run!
 	for _, test := range tests {
+		tt := test
 		t.Run(test.scenario, func(st *testing.T) {
-			test.method(st, resource)
+			tt.method(st, resource)
 		})
 	}
 }
 
-func testFactoryShouldReturnConnectionErrors(t *testing.T, resource *dockertest.Resource) {
+func testFactoryShouldReturnConnectionErrors(t *testing.T, _ *dockertest.Resource) {
 	c := getConfig(t, "valid_queue_and_exchange_config.yml")
 	t.Run("when we pass an invalid port", func(t *testing.T) {
 		conn := c.Connections["default"]
@@ -168,12 +169,10 @@ func testConsumerReconnect(t *testing.T, resource *dockertest.Resource) {
 	// send new messages
 	sendMessages(t, resource, "upload-picture", "android.profile.upload", 4, 6)
 	time.Sleep(1 * time.Second)
-	err = sup.Stop()
-	require.NoError(t, err, "Failed to close the supervisor")
+	sup.Stop()
 	// Verify if process all 6 messages
 	require.Len(t, processSubscriber.Receiver, 6, "processSubscriber should have 6 messages")
-	err = sup.Stop()
-	require.NoError(t, err, "fail to close the supervisor and consumers")
+	sup.Stop()
 }
 
 func sendMessages(t *testing.T, resource *dockertest.Resource, ex, key string, start, count int) {
@@ -203,7 +202,7 @@ func getConfig(t *testing.T, configFile string) Config {
 
 	err = viper.UnmarshalKey("rabbitmq", &c)
 	assert.NoError(t, err, "Failed to marshal the config struct: ")
-	setConfigDefaults(&c)
+	assert.NoError(t, setConfigDefaults(&c))
 	return c
 }
 
@@ -213,7 +212,9 @@ func setDSN(resource *dockertest.Resource, conn Connection) Connection {
 }
 
 func closeRabbitMQConnections(t *testing.T, resource *dockertest.Resource) {
-	client, err := rabbithole.NewClient(fmt.Sprintf("http://localhost:%s", resource.GetPort("15672/tcp")), "guest", "guest")
+	client, err := rabbithole.NewClient(
+		fmt.Sprintf("http://localhost:%s", resource.GetPort("15672/tcp")),
+		"guest", "guest")
 	require.NoError(t, err, "Fail to create the rabbithole client")
 	conns, err := client.ListConnections()
 	require.NoError(t, err, "fail to get all the connections")
@@ -229,7 +230,7 @@ type mockRunner struct {
 	exitStatus int
 }
 
-func (m *mockRunner) Process(ctx context.Context, msg runner.Message) (int, error) {
+func (m *mockRunner) Process(_ context.Context, _ runner.Message) (int, error) {
 	atomic.AddInt64(&m.count, 1)
 	return m.exitStatus, nil
 }

@@ -24,12 +24,13 @@ var RootCmd = &cobra.Command{
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	RootCmd.Version = fmt.Sprintf("%v, commit %v, built at %v", version, commit, date)
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", ".cannon.yaml", "config file (default is .cannon.yaml)")
+
+	setupLaunchFlags()
+	RootCmd.AddCommand(launchCmd)
+
 	if err := RootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-}
-
-func init() {
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", ".cannon.yaml", "config file (default is .cannon.yaml)")
 }

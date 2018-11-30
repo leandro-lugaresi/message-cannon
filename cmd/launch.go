@@ -57,12 +57,14 @@ var launchCmd = &cobra.Command{
 		// Block until a signal is received.
 		s := <-osSignals
 		cmd.Printf("signal %s received. shutting down...", s)
-		return errors.Wrap(sup.Stop(), "error stopping the supervisor")
+		sup.Stop()
+		return nil
 	},
 }
 
-func init() {
-	launchCmd.Flags().DurationP("interval-checks", "c", 500*time.Millisecond, "this flag set the interval duration of supervisor operations")
+func setupLaunchFlags() {
+	launchCmd.Flags().DurationP("interval-checks", "c", 500*time.Millisecond,
+		"this flag set the interval duration of supervisor operations")
 	err := viper.BindPFlag("interval-checks", launchCmd.Flags().Lookup("interval-checks"))
 	if err != nil {
 		log.Fatal(err)
@@ -79,7 +81,6 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	RootCmd.AddCommand(launchCmd)
 }
 
 // initConfig reads in config file and ENV variables if set.

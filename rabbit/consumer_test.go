@@ -60,9 +60,24 @@ func Test_getHeaders(t *testing.T) {
 				Body: []byte(`foooo`),
 				Headers: amqp.Table{
 					"x-death": []interface{}{
-						amqp.Table{"time": "2018-02-13T17:50:26-02:00", "count": int64(4), "exchange": "fallback", "queue": "fallback", "reason": "expired"},
-						amqp.Table{"time": "2018-02-13T17:50:34-02:00", "count": int64(1), "exchange": "fallback", "queue": "fallback", "reason": "rejected"},
-						amqp.Table{"time": "2018-02-13T17:45:26-02:00", "count": int64(5), "exchange": "fallback", "queue": "GenerateReport", "reason": "rejected"},
+						amqp.Table{
+							"time":     "2018-02-13T17:50:26-02:00",
+							"count":    int64(4),
+							"exchange": "fallback",
+							"queue":    "fallback",
+							"reason":   "expired"},
+						amqp.Table{
+							"time":     "2018-02-13T17:50:34-02:00",
+							"count":    int64(1),
+							"exchange": "fallback",
+							"queue":    "fallback",
+							"reason":   "rejected"},
+						amqp.Table{
+							"time":     "2018-02-13T17:45:26-02:00",
+							"count":    int64(5),
+							"exchange": "fallback",
+							"queue":    "GenerateReport",
+							"reason":   "rejected"},
 					},
 				},
 			},
@@ -76,9 +91,10 @@ func Test_getHeaders(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		ctt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			got := getHeaders(tt.args)
-			require.Exactly(t, tt.want, got)
+			got := getHeaders(ctt.args)
+			require.Exactly(t, ctt.want, got)
 		})
 	}
 }

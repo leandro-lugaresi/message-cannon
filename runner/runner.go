@@ -66,7 +66,7 @@ func New(c Config, h *hub.Hub) (Runnable, error) {
 	case "command":
 		return newCommand(c, h)
 	case "http":
-		return newHTTP(c, h)
+		return newHTTP(c, h), nil
 	}
 	return nil, errors.Errorf(
 		"Invalid Runner type (\"%s\") expecting one of (%s)",

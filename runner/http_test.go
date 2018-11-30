@@ -150,7 +150,7 @@ func Test_httpRunner_Process(t *testing.T) {
 		{
 			"request with timeout",
 			args{
-				[]byte(`{"sleep": 4000000000, "code":500, "contentType": "text/html", "message": {"error": "PHP Exception :p"}}`),
+				[]byte(`{"sleep": 4000000000, "code":500, "contentType": "text/html", "message": {"error": "Fooo"}}`),
 				map[string]string{},
 			},
 			wants{
@@ -173,25 +173,26 @@ func Test_httpRunner_Process(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		ctt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			config := Config{
-				IgnoreOutput: tt.ignoreOutput,
+				IgnoreOutput: ctt.ignoreOutput,
 				Type:         "http",
 				Timeout:      1 * time.Second,
 				Options:      Options{URL: "http://localhost:8089"},
 			}
-			defaults.Set(&config)
+			require.NoError(t, defaults.Set(&config))
 			runner, err := New(config, hub.New())
 			require.NoError(t, err)
 
-			got, err := runner.Process(ctx, Message{Body: tt.args.b, Headers: tt.args.headers})
-			if len(tt.wants.err) > 0 {
-				require.Contains(t, err.Error(), tt.wants.err)
+			got, err := runner.Process(ctx, Message{Body: ctt.args.b, Headers: ctt.args.headers})
+			if len(ctt.wants.err) > 0 {
+				require.Contains(t, err.Error(), ctt.wants.err)
 			} else {
 				require.NoError(t, err)
 			}
-			require.Equal(t, tt.wants.exitCode, got, "result httpRunner.Process() differs")
+			require.Equal(t, ctt.wants.exitCode, got, "result httpRunner.Process() differs")
 		})
 	}
 }

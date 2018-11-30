@@ -15,7 +15,7 @@ func TestManager(t *testing.T) {
 		newStubFactory("RabbitMQ", 4),
 		newStubFactory("NATS", 3),
 	}
-	manager := NewManager(time.Duration(50*time.Millisecond), hub.New())
+	manager := NewManager(50*time.Millisecond, hub.New())
 	t.Run("Should start all consumers from factories", func(t *testing.T) {
 		err := manager.Start(factories)
 		assert.NoError(t, err, "Start should not return an error")
@@ -33,7 +33,7 @@ func TestManager(t *testing.T) {
 	})
 	t.Run("Should checkConsumers for dead consumers", func(t *testing.T) {
 		// Simulate a closed connection
-		manager.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
+		manager.ops <- func(factories map[string]Factory, _ map[string]Consumer) {
 			factories["RabbitMQ"].(*stubFactory).Close()
 		}
 		time.Sleep(5 * time.Millisecond)
@@ -48,7 +48,7 @@ func TestManager(t *testing.T) {
 		time.Sleep(50 * time.Millisecond) //sleep to checkConsumer run
 		var wg sync.WaitGroup
 		wg.Add(1)
-		manager.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
+		manager.ops <- func(_ map[string]Factory, consumers map[string]Consumer) {
 			for name, c := range consumers {
 				if strings.HasPrefix(name, "RabbitMQ-") {
 					assert.True(t, c.Alive(), "The %s should be alive now", name)
@@ -60,8 +60,7 @@ func TestManager(t *testing.T) {
 		wg.Wait()
 	})
 	t.Run("Stop should stop all consumers", func(t *testing.T) {
-		err := manager.Stop()
-		assert.NoError(t, err)
+		manager.Stop()
 		var wg sync.WaitGroup
 		wg.Add(1)
 		manager.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
