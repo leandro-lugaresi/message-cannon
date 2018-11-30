@@ -93,12 +93,10 @@ func (c *consumer) Run() {
 	})
 }
 
-// Kill will try to stop the internal work. Return an error in case of failure.
-func (c *consumer) Kill() error {
-	var err error
-	c.t.Kill(err)
+// Kill will try to stop the internal work.
+func (c *consumer) Kill() {
+	c.t.Kill(nil)
 	<-c.t.Dead()
-	return err
 }
 
 // Alive returns true if the tomb is not in a dying or dead state.

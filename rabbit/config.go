@@ -9,15 +9,6 @@ import (
 	"github.com/streadway/amqp"
 )
 
-// DeliveryMode describes an AMQP message delivery mode.
-type DeliveryMode int
-
-// List of available values for `delivery_mode` producer option.
-const (
-	NonPersistent DeliveryMode = 1
-	Persistent                 = 2
-)
-
 // Config describes all available options for amqp connection creation.
 type Config struct {
 	// Connections describe the connections used by consumers.
@@ -95,14 +86,16 @@ func setConfigDefaults(config *Config) error {
 		return err
 	}
 
-	for k, cfg := range config.Connections {
+	for k := range config.Connections {
+		cfg := config.Connections[k]
 		if err := defaults.Set(&cfg); err != nil {
 			return err
 		}
 		config.Connections[k] = cfg
 	}
 
-	for k, cfg := range config.Consumers {
+	for k := range config.Consumers {
+		cfg := config.Consumers[k]
 		if err := defaults.Set(&cfg); err != nil {
 			return err
 		}
@@ -116,14 +109,16 @@ func setConfigDefaults(config *Config) error {
 		config.Consumers[k] = cfg
 	}
 
-	for k, cfg := range config.DeadLetters {
+	for k := range config.DeadLetters {
+		cfg := config.DeadLetters[k]
 		if err := defaults.Set(&cfg); err != nil {
 			return err
 		}
 		config.DeadLetters[k] = cfg
 	}
 
-	for k, cfg := range config.Exchanges {
+	for k := range config.Exchanges {
+		cfg := config.Exchanges[k]
 		if err := defaults.Set(&cfg); err != nil {
 			return err
 		}

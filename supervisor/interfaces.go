@@ -18,7 +18,7 @@ type Consumer interface {
 	Run()
 
 	// Kill will try to stop the internal work. Return an error in case of failure.
-	Kill() error
+	Kill()
 
 	// Alive returns true if the tomb is not in a dying or dead state.
 	Alive() bool

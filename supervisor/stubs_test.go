@@ -39,7 +39,9 @@ func (f *stubFactory) CreateConsumers() ([]Consumer, error) {
 
 func (f *stubFactory) CreateConsumer(name string) (Consumer, error) {
 	if !strings.HasPrefix(name, f.name+"-consumer-") {
-		return nil, fmt.Errorf("Consumer name not expected, expected: \"%s-consumer-\", received: \"%s\" ", f.name, name)
+		return nil, fmt.Errorf(
+			"Consumer name not expected, expected: \"%s-consumer-\", received: \"%s\" ",
+			f.name, name)
 	}
 	return newStubConsumer(name, f.name, f.connectionClosed), nil
 }
@@ -82,11 +84,9 @@ func (c *stubConsumer) Run() {
 	})
 }
 
-func (c *stubConsumer) Kill() error {
-	var err error
-	c.t.Kill(err)
+func (c *stubConsumer) Kill() {
+	c.t.Kill(nil)
 	<-c.t.Dead()
-	return err
 }
 
 func (c *stubConsumer) Alive() bool {

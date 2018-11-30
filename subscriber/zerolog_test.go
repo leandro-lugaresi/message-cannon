@@ -82,6 +82,7 @@ func TestLogSubscriber(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		ctt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			h := hub.New()
 			w := &bytes.Buffer{}
@@ -91,10 +92,10 @@ func TestLogSubscriber(t *testing.T) {
 				done:   make(chan struct{}),
 			}
 			go log.Do()
-			h.Publish(tt.msg)
+			h.Publish(ctt.msg)
 			h.Close()
 			log.Stop()
-			require.JSONEq(t, tt.result, w.String())
+			require.JSONEq(t, ctt.result, w.String())
 		})
 	}
 }

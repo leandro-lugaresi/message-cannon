@@ -27,6 +27,7 @@ func (p *httpRunner) Process(ctx context.Context, msg Message) (int, error) {
 	if err != nil {
 		return ExitNACKRequeue, errors.Wrap(err, "request creation failed")
 	}
+	req = req.WithContext(ctx)
 	resp, body, err := p.executeRequest(req)
 	if err != nil {
 		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
@@ -106,7 +107,7 @@ func (p *httpRunner) executeRequest(req *http.Request) (*http.Response, []byte, 
 	return resp, body, nil
 }
 
-func newHTTP(c Config, h *hub.Hub) (*httpRunner, error) {
+func newHTTP(c Config, h *hub.Hub) *httpRunner {
 	runner := httpRunner{
 		hub:          h,
 		url:          c.Options.URL,
@@ -123,5 +124,5 @@ func newHTTP(c Config, h *hub.Hub) (*httpRunner, error) {
 			},
 		},
 	}
-	return &runner, nil
+	return &runner
 }

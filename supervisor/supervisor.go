@@ -64,17 +64,13 @@ func (m *Manager) Start(fs []Factory) error {
 }
 
 // Stop all the consumers
-func (m *Manager) Stop() error {
-	var errors MultiError
+func (m *Manager) Stop() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	m.ops <- func(factories map[string]Factory, consumers map[string]Consumer) {
 		defer wg.Done()
 		for name, c := range consumers {
-			err := c.Kill()
-			if err != nil {
-				errors = append(errors, err)
-			}
+			c.Kill()
 			delete(consumers, name)
 		}
 		for name := range factories {
@@ -82,10 +78,6 @@ func (m *Manager) Stop() error {
 		}
 	}
 	wg.Wait()
-	if len(errors) > 0 {
-		return errors
-	}
-	return nil
 }
 
 // checkConsumers will tick and send operations to do some checks
