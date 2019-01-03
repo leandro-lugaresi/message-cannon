@@ -4,7 +4,6 @@ language: go
 go: 1.11
 services:
   - docker
-
 env:
   - GO111MODULE=on
 
@@ -13,7 +12,7 @@ script: make ci
 after_success:
   - bash <(curl -s https://codecov.io/bash)
 
-  before_deploy:
+before_deploy:
   - gem install fpm
   - which fpm
   - sudo apt-get update
