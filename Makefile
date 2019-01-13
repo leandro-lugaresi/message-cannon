@@ -3,11 +3,10 @@ TEST_PATTERN?=./...
 TEST_OPTIONS?=-race
 
 setup: ## Install all the build and lint dependencies
-	go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
-	go get -u github.com/golang/dep/...
-	go get -u github.com/mfridman/tparse
-	go get -u golang.org/x/tools/cmd/cover
-	dep ensure
+	go get github.com/golangci/golangci-lint/cmd/golangci-lint
+	go get github.com/mfridman/tparse
+	go get golang.org/x/tools/cmd/cover
+	go get ./...
 
 test: ## Run all the tests
 	go test $(TEST_OPTIONS) -covermode=atomic -coverprofile=coverage.txt -timeout=1m -cover -json $(SOURCE_FILES) | tparse -all
@@ -24,7 +23,8 @@ fmt: ## gofmt and goimports all go files
 lint: ## Run all the linters
 	golangci-lint run
 
-ci: lint test ## Run all the tests and code checks
+ci: lint ## Run all the tests and code checks
+	go test $(TEST_OPTIONS) -covermode=atomic -coverprofile=coverage.txt -timeout=1m -cover -json $(SOURCE_FILES) | tparse -all -smallscreen
 
 build: ## Build a beta version
 	go build -race -o ./dist/message-cannon ./main.go
