@@ -25,7 +25,7 @@ var launchCmd = &cobra.Command{
 	Use:   "launch",
 	Short: "Launch will start all the consumers from the config file",
 	Long:  `Launch will start all the consumers from the config file `,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		err := initConfig()
 		if err != nil {
 			return errors.Wrap(err, "failed initializing the config")

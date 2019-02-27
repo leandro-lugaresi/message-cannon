@@ -21,15 +21,29 @@ const (
 )
 
 type (
+	// Headers are a map with key and values used do pass parameters to runners
+	// Every runner can choose how to handle the headers values but they will only support these types:
+	//   bool
+	//   float32
+	//   float64
+	//   int
+	//   int16
+	//   int32
+	//   int64
+	//   string
+	//   time.Time
+	//   []byte
+	Headers map[string]interface{}
+
+	// Message is an container struct with an body and headers
+	Message struct {
+		Body    []byte
+		Headers Headers
+	}
+
 	// Runnable represent an runnable used by consumers to handle messages.
 	Runnable interface {
 		Process(context.Context, Message) (int, error)
-	}
-
-	// Message is an container struct with general fields used by messages.
-	Message struct {
-		Body    []byte
-		Headers map[string]string
 	}
 
 	// Options is a composition os all options used internally by runners.
