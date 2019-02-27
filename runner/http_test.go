@@ -24,7 +24,7 @@ func Test_httpRunner_Process(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method != "POST" {
-			http.Error(w, http.StatusText(405), 405)
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 			return
 		}
 		msg := message{}
@@ -282,16 +282,17 @@ func Test_httpRunner_setHeaders(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		ctt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			p := newHTTP(Config{
 				Options: Options{
-					Headers: tt.headers,
+					Headers: ctt.headers,
 				},
 			}, hub.New())
-			req, err := http.NewRequest("POST", "http://localhost", bytes.NewReader(tt.msg.Body))
+			req, err := http.NewRequest("POST", "http://localhost", bytes.NewReader(ctt.msg.Body))
 			require.NoError(t, err)
-			p.setHeaders(req, tt.msg)
-			require.Equal(t, tt.want, req.Header)
+			p.setHeaders(req, ctt.msg)
+			require.Equal(t, ctt.want, req.Header)
 		})
 	}
 }
