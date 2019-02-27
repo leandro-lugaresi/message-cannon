@@ -72,7 +72,7 @@ func Test_command_Process(t *testing.T) {
 				ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
 				defer cancel()
 			}
-			exitCode, err := c.Process(ctx, Message{Body: ctt.args.b, Headers: map[string]string{}})
+			exitCode, err := c.Process(ctx, Message{Body: ctt.args.b, Headers: Headers{}})
 			if len(ctt.wants.err) > 0 {
 				require.Contains(t, err.Error(), ctt.wants.err)
 			} else {

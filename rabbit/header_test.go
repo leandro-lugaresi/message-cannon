@@ -3,6 +3,7 @@ package rabbit
 import (
 	"testing"
 
+	"github.com/leandro-lugaresi/message-cannon/runner"
 	"github.com/streadway/amqp"
 	"github.com/stretchr/testify/require"
 )
@@ -11,12 +12,12 @@ func Test_getHeaders(t *testing.T) {
 	tests := []struct {
 		name string
 		args amqp.Delivery
-		want map[string]string
+		want runner.Headers
 	}{
 		{
 			"with empty headers",
 			amqp.Delivery{Body: []byte(`foooo`)},
-			map[string]string{
+			runner.Headers{
 				"Content-Encoding": "",
 				"Content-Type":     "",
 				"Correlation-Id":   "",
@@ -32,7 +33,7 @@ func Test_getHeaders(t *testing.T) {
 				MessageId:       "12345566",
 				Body:            []byte(`foooo`),
 			},
-			map[string]string{
+			runner.Headers{
 				"Content-Encoding": "compress, gzip",
 				"Content-Type":     "application/json",
 				"Correlation-Id":   "id-12334455",
@@ -47,7 +48,7 @@ func Test_getHeaders(t *testing.T) {
 					"x-death": []amqp.Table{},
 				},
 			},
-			map[string]string{
+			runner.Headers{
 				"Content-Encoding": "",
 				"Content-Type":     "",
 				"Correlation-Id":   "",
@@ -81,12 +82,30 @@ func Test_getHeaders(t *testing.T) {
 					},
 				},
 			},
-			map[string]string{
+			runner.Headers{
 				"Content-Encoding": "",
 				"Content-Type":     "",
 				"Correlation-Id":   "",
 				"Message-Id":       "",
 				"Message-Deaths":   "6",
+			},
+		},
+		{
+			"with custom headers",
+			amqp.Delivery{
+				Body: []byte(`foooo`),
+				Headers: amqp.Table{
+					"Authorization":   "Basic YWxhZGRpbjpvcGVuc2VzYW1l",
+					"X-Forwarded-For": "203.0.113.195, 70.41.3.18, 150.172.238.178",
+				},
+			},
+			runner.Headers{
+				"Content-Encoding": "",
+				"Content-Type":     "",
+				"Correlation-Id":   "",
+				"Message-Id":       "",
+				"Authorization":    "Basic YWxhZGRpbjpvcGVuc2VzYW1l",
+				"X-Forwarded-For":  "203.0.113.195, 70.41.3.18, 150.172.238.178",
 			},
 		},
 	}

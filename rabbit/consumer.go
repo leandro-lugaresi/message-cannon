@@ -3,7 +3,6 @@ package rabbit
 import (
 	"context"
 	"errors"
-	"strconv"
 	"time"
 
 	"gopkg.in/tomb.v2"
@@ -163,33 +162,4 @@ func (c *consumer) processMessage(ctx context.Context, msg amqp.Delivery) {
 			Fields: hub.Fields{"error": err},
 		})
 	}
-}
-
-func getHeaders(msg amqp.Delivery) map[string]string {
-	headers := map[string]string{
-		"Content-Type":     msg.ContentType,
-		"Content-Encoding": msg.ContentEncoding,
-		"Correlation-Id":   msg.CorrelationId,
-		"Message-Id":       msg.MessageId,
-	}
-	xdeaths, ok := msg.Headers["x-death"].([]interface{})
-	if !ok {
-		return headers
-	}
-	var (
-		count, deathCount int64
-		xdeath            amqp.Table
-	)
-	for _, ideath := range xdeaths {
-		xdeath, ok = ideath.(amqp.Table)
-		if !ok {
-			continue
-		}
-		if xdeath["reason"] != "expired" {
-			count, _ = xdeath["count"].(int64)
-			deathCount += count
-		}
-	}
-	headers["Message-Deaths"] = strconv.FormatInt(deathCount, 10)
-	return headers
 }

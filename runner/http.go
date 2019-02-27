@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/leandro-lugaresi/hub"
@@ -72,13 +74,28 @@ func (p *httpRunner) prepareRequest(msg Message) (*http.Request, error) {
 	if err != nil {
 		return req, err
 	}
-	for k, v := range msg.Headers {
-		req.Header.Set(k, v)
-	}
+	p.setHeaders(req, msg)
+	return req, nil
+}
+
+func (p *httpRunner) setHeaders(req *http.Request, msg Message) {
 	for k, v := range p.headers {
 		req.Header.Set(k, v)
 	}
-	return req, nil
+	for k, v := range msg.Headers {
+		switch vt := v.(type) {
+		case int, int16, int32, int64, float32, float64:
+			req.Header.Set(k, fmt.Sprint(vt))
+		case string:
+			req.Header.Set(k, vt)
+		case []byte:
+			req.Header.Set(k, string(vt))
+		case time.Time:
+			req.Header.Set(k, vt.Format(http.TimeFormat))
+		case bool:
+			req.Header.Set(k, strconv.FormatBool(vt))
+		}
+	}
 }
 
 func (p *httpRunner) executeRequest(req *http.Request) (*http.Response, []byte, error) {

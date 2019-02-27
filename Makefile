@@ -3,9 +3,9 @@ TEST_PATTERN?=./...
 TEST_OPTIONS?=-race
 
 setup: ## Install all the build and lint dependencies
-	go get github.com/golangci/golangci-lint/cmd/golangci-lint
-	go get github.com/mfridman/tparse
-	go get golang.org/x/tools/cmd/cover
+	GO111MODULE=off go get github.com/golangci/golangci-lint/cmd/golangci-lint
+	GO111MODULE=off go get github.com/mfridman/tparse
+	GO111MODULE=off go get golang.org/x/tools/cmd/cover
 	go get ./...
 
 test: ## Run all the tests
