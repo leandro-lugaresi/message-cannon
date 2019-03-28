@@ -40,7 +40,7 @@ rabbitmq:
     upload_picture:
       connection: default
       workers: 1                 # Number of concurrent messages processed. Defaults to 1.
-      prefetch_count: 10         # Prefetch message count per worker.
+      prefetch_count: 10         # Prefetch message count per consumer. Must be greater or equal than workers.
       dead_letter: fallback
       queue:
         name: "upload-picture"
