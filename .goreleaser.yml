@@ -37,8 +37,6 @@ nfpm:
   formats:
   - deb
   - rpm
-  dependencies:
-  - git
   recommends:
   - rpm
 snapcraft:
